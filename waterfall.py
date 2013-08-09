@@ -18,10 +18,14 @@ import pysdrext
 
 bins = 4096
 
-process = subprocess.Popen(['arecord', '-c', '2', '-f', 'FLOAT_LE',
-				'-r', '64000', '--buffer-size', str(bins)],
+#process = subprocess.Popen(['arecord', '-c', '2', '-f', 'FLOAT_LE',
+#				'-r', '64000', '--buffer-size', str(bins)],
+#			shell=False, stdin=None, stdout=subprocess.PIPE)
+#sig_input = RawSigInput(64000, 2, np.dtype(np.float32), process.stdout)
+
+process = subprocess.Popen(['jack-stdout', '-e', 'float', '--bufsize', str(bins), 'jack0', 'jack1'],
 			shell=False, stdin=None, stdout=subprocess.PIPE)
-sig_input = RawSigInput(64000, 2, np.dtype(np.float32), process.stdout)
+sig_input = RawSigInput(48000, 2, np.dtype(np.float32), process.stdout)
 
 window = 0.5 * (1.0 - np.cos((2 * math.pi * np.arange(bins)) / bins))
 
@@ -85,6 +89,13 @@ def reshapeFun(w, h):
 
 	view.set_dimensions(w, h)
 
+calibrate_rq = False
+
+def keyPressedFun(key, x, y):
+	global calibrate_rq
+	if key == 'c':
+		calibrate_rq = True
+
 wf_inserts = Queue.Queue()
 wf_edge = 0
 
@@ -103,10 +114,26 @@ def idleFun():
 		return
 
 def process():
+	global mag_a, mag_b, calibrate_rq
+
 	while True:
 		signal = sig_input.read(bins)
 		spectrum = np.log(np.absolute(np.fft.fft(np.multiply(signal, window))))
 		spectrum = np.concatenate((spectrum[bins/2:bins], spectrum[0:bins/2]))
+
+		if calibrate_rq:
+			calibrate_rq = False
+
+			a = int(((-view.origin_x) / view.scale_x + 1) / 2 * bins)
+			b = int(((-view.origin_x + view.width) / view.scale_x + 1) / 2 * bins)
+
+			a = max(0, min(bins - 1, a))
+			b = max(0, min(bins - 1, b))
+
+			if a != b:
+				area = spectrum[a:b]
+				mag_a = np.min(area) - 0.5
+				mag_b = np.max(area) + 1.0
 
 		scale = 2.75 / (mag_b - mag_a)
 		shift = -mag_a * scale - 1.75
@@ -124,11 +151,12 @@ if __name__ == "__main__":
 	glutMouseFunc(mouseFun)
 	glutMotionFunc(motionFun)
 	glutReshapeFunc(reshapeFun)
+	glutKeyboardFunc(keyPressedFun)
 
-	if bins % 2048 != 0:
-		raise NotImplementedError("bins must be multiply of 2048")
+	if bins % 1024 != 0:
+		raise NotImplementedError("bins must be multiply of 1024")
 
-	multitexture = MultiTexture(2048, 512, bins / 2048, 8)
+	multitexture = MultiTexture(1024, 1024, bins / 1024, 4)
 	overlay = PlotOverlay(view, sig_input)
 
 	initFun()
