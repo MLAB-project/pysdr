@@ -1,5 +1,9 @@
 import numpy as np
-import select
+import time
+import sys
+
+sys.path.append("./pysdrext/pysdrext_directory")
+import pysdrext
 
 class SigInput:
 	def __init__(self):
@@ -8,6 +12,9 @@ class SigInput:
 
 	def read(self, frames):
 		raise NotImplementedError("read() method must be overrided")
+
+	def start(self):
+		raise NotImplementedError("start() method must be overrided")
 
 class RawSigInput(SigInput):
 	def __init__(self, sample_rate, no_channels, dtype, file):
@@ -25,3 +32,24 @@ class RawSigInput(SigInput):
 			return np.fromstring(string, dtype=np.complex64)
 		else:
 			raise NotImplementedError("unimplemented no of channels and type combination")
+
+	def start(self):
+		pass
+
+class JackInput(SigInput):
+	def __init__(self, name):
+		self.name = name
+		self.handle = pysdrext.jack_init(name)
+		self.sample_rate = pysdrext.jack_get_sample_rate(self.handle)
+
+	def read(self, frames):
+		while True:
+			r = pysdrext.jack_gather_samples(self.handle, frames)
+
+			if r != None:
+				return r
+
+			time.sleep(frames / self.sample_rate / 10)
+
+	def start(self):
+		pysdrext.jack_activate(self.handle)

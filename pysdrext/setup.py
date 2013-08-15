@@ -5,7 +5,7 @@ def configuration(parent_package='', top_path=None):
     config = Configuration('pysdrext_directory',
                            parent_package,
                            top_path)
-    config.add_extension('pysdrext', ['pysdr.c'])
+    config.add_extension('pysdrext', ['pysdr.c'], libraries=['jack'])
 
     return config
 
