@@ -50,7 +50,7 @@ static PyObject *pysdr_jack_init(PyObject *self, PyObject *args)
 
     jack_handle_t *handle = (jack_handle_t *) malloc(sizeof(jack_handle_t));
 
-    if ((handle->client = jack_client_open(name, JackNullOption, 0)) == 0) {
+    if ((handle->client = jack_client_open(name, JackNoStartServer, 0)) == 0) {
         free(handle);
         PyErr_SetString(PyExc_RuntimeError, "cannot create jack client");
         return NULL;
@@ -125,12 +125,12 @@ static PyObject *pysdr_jack_gather_samples(PyObject *self, PyObject *args)
 
     int read = 0;
     while (read < frames_no)
-        read += jack_ringbuffer_read(handle->ringbuffer, (char *) samples[2 * read],
-                                        2 * sizeof(float) * frames_no);
+        read += jack_ringbuffer_read(handle->ringbuffer, (char *) &(samples[2 * read]),
+                                        2 * sizeof(float) * (frames_no - read));
 
     npy_intp dims[1] = { frames_no };
     PyObject *array = PyArray_SimpleNewFromData(1, dims, NPY_COMPLEX64, samples);
-    PyArray_ENABLEFLAGS(array, NPY_ARRAY_OWNDATA);
+    ((PyArrayObject *) array)->flags |= NPY_OWNDATA; 
     return array;
 }
 
