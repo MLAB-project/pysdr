@@ -14,6 +14,9 @@ Jack sink waterfall with OpenGL acceleration. This software plot live waterfall 
 
 Python
 python-opengl
+python-dev
+jack-stdio
+
 
 ## Howto
 
