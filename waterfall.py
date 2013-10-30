@@ -4,6 +4,7 @@ import subprocess
 import Queue
 import threading
 import numpy as np
+import argparse
 
 from OpenGL.GL import *
 from OpenGL.GLUT import *
@@ -15,19 +16,6 @@ from overlay import *
 
 sys.path.append("./pysdrext/pysdrext_directory")
 import pysdrext
-
-bins = 4096
-
-#process = subprocess.Popen(['arecord', '-c', '2', '-f', 'FLOAT_LE',
-#				'-r', '64000', '--buffer-size', str(bins)],
-#			shell=False, stdin=None, stdout=subprocess.PIPE)
-#sig_input = RawSigInput(64000, 2, np.dtype(np.float32), process.stdout)
-
-process = subprocess.Popen(['jack-stdout', '-e', 'float', '--bufsize', str(bins), 'jack0', 'jack1'],
-			shell=False, stdin=None, stdout=subprocess.PIPE)
-sig_input = RawSigInput(48000, 2, np.dtype(np.float32), process.stdout)
-
-window = 0.5 * (1.0 - np.cos((2 * math.pi * np.arange(bins)) / bins))
 
 mag_a = -5
 mag_b = 5
@@ -142,6 +130,25 @@ def process():
 		wf_inserts.put(line)
 
 if __name__ == "__main__":
+	parser = argparse.ArgumentParser(description='Plot live spectral waterfall of an IQ signal.')
+	parser.add_argument('-b', '--bins', type=int, default=4096,
+						help='number of bins')
+	parser.add_argument('-j', '--jack', metavar='NAME', default='pysdr',
+						help='feed signal from JACK under the given name')
+	parser.add_argument('-r', '--raw', metavar='RATE', type=int,
+						help='feed signal from the standard input, 2 channel \
+								interleaved floats with the given samplerate')
+
+	args = parser.parse_args()
+
+	bins = args.bins
+	window = 0.5 * (1.0 - np.cos((2 * math.pi * np.arange(bins)) / bins))
+
+	if args.raw:
+		sig_input = RawSigInput(args.raw, 2, np.dtype(np.float32), sys.stdin)
+	else:
+		sig_input = JackInput(args.jack)
+
 	glutInit()
 	glutInitWindowSize(640, 480)
 	glutCreateWindow('PySDR')
@@ -163,5 +170,7 @@ if __name__ == "__main__":
 
 	process_t = threading.Thread(target=process)
 	process_t.start()
+
+	sig_input.start()
 
 	glutMainLoop()
