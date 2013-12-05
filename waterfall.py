@@ -131,8 +131,6 @@ class WaterfallWindow():
 			spectrum = np.concatenate((spectrum[self.bins/2:self.bins],
 										spectrum[0:self.bins/2]))
 
-			print signal[0]
-
 			if self.calibrate_rq:
 				self.calibrate_rq = False
 
