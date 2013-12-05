@@ -17,117 +17,143 @@ from overlay import *
 sys.path.append("./pysdrext/pysdrext_directory")
 import pysdrext
 
-mag_a = -5
-mag_b = 5
+class WaterfallWindow():
+	def __init__(self, sig_input, bins):
+		if bins % 1024 != 0:
+			raise NotImplementedError("number of bins must be a multiple of 1024")
 
-view = View()
-overlay = None
+		self.mag_a = -5
+		self.mag_b = 5
+		self.calibrate_rq = False
 
-def initFun():
-	glClearColor(0.0, 0.0, 0.0, 0.0)
-	glColor3f(0.0, 0.0, 0.0)
-	glLineWidth(1.0)
-	glEnable(GL_BLEND)
+		self.sig_input = sig_input
+		self.bins = bins
+		self.window = 0.5 * (1.0 - np.cos((2 * math.pi * np.arange(self.bins)) / self.bins))
 
-def displayFun():
-	glClear(GL_COLOR_BUFFER_BIT)
+		glutCreateWindow('PySDR')
+		glutDisplayFunc(self.display)
+		glutIdleFunc(self.idle)
+		glutMouseFunc(self.mouse)
+		glutMotionFunc(self.motion)
+		glutReshapeFunc(self.reshape)
+		glutKeyboardFunc(self.keyboard)
 
-	glLoadIdentity()
+		self.init()
 
-	glPushMatrix()
+		self.view = View()
+		self.multitexture = MultiTexture(1024, 1024, self.bins / 1024, 1)
+		self.overlay = PlotOverlay(self.view, self.sig_input)
 
-	view.setup()
+		self.button_down = False
+		self.console_active = False
 
-	glPushMatrix()
-	glTranslated(-1.0, 0.0, 0.0)
-	glScalef(2.0, 1.0, 1.0)
-	multitexture.draw_scroll(wf_edge)
-	glPopMatrix()
-	
-	overlay.draw()
+		self.wf_inserts = Queue.Queue()
+		self.wf_edge = 0
 
-	glPopMatrix()
+		self.process_t = threading.Thread(target=self.process)
+		self.process_t.setDaemon(True)
+		self.process_t.start()
 
-	glutSwapBuffers()
-	glutPostRedisplay()
+	def start(self):
+		self.sig_input.start()
 
-button_down = False
+	def init(self):
+		glClearColor(0.0, 0.0, 0.0, 0.0)
+		glColor3f(0.0, 0.0, 0.0)
+		glLineWidth(1.0)
+		glEnable(GL_BLEND)
 
-def mouseFun(button, state, x, y):
-	global button_down
-	if state == GLUT_DOWN:
-		button_down = True
-		view.click(button == GLUT_RIGHT_BUTTON, x, view.get_height() - y)
+	def display(self):
+		glClear(GL_COLOR_BUFFER_BIT)
 
-	if state == GLUT_UP:
-		button_down = False
-	glutPostRedisplay()
+		glLoadIdentity()
 
-def motionFun(x, y):
-	if button_down:
-		view.drag(x, view.get_height() - y)
-	glutPostRedisplay()
+		glPushMatrix()
 
-def reshapeFun(w, h):
-	glViewport(0, 0, w, h)
-	glMatrixMode(GL_PROJECTION)
-	glLoadIdentity()
-	gluOrtho2D(0.0, w, 0.0, h)
-	glMatrixMode(GL_MODELVIEW)
+		self.view.setup()
 
-	view.set_dimensions(w, h)
+		glPushMatrix()
+		glTranslated(-1.0, 0.0, 0.0)
+		glScalef(2.0, 1.0, 1.0)
+		self.multitexture.draw_scroll(self.wf_edge)
+		glPopMatrix()
 
-calibrate_rq = False
+		self.overlay.draw()
 
-def keyPressedFun(key, x, y):
-	global calibrate_rq
-	if key == 'c':
-		calibrate_rq = True
+		glPopMatrix()
 
-wf_inserts = Queue.Queue()
-wf_edge = 0
+		glutSwapBuffers()
+		glutPostRedisplay()
 
-def idleFun():
-	global wf_edge
+	def mouse(self, button, state, x, y):
+		if state == GLUT_DOWN:
+			self.button_down = True
+			self.view.click(button == GLUT_RIGHT_BUTTON, x, self.view.get_height() - y)
 
-	try:
-		while not wf_inserts.empty():
-			rec = wf_inserts.get_nowait()
-			multitexture.insert(wf_edge, rec)
+		if state == GLUT_UP:
+			self.button_down = False
+		glutPostRedisplay()
 
-			wf_edge += 1
-			if wf_edge >= multitexture.get_height():
-				wf_edge = 0
-	except Queue.Empty:
-		return
+	def motion(self, x, y):
+		if self.button_down:
+			self.view.drag(x, self.view.get_height() - y)
+		glutPostRedisplay()
 
-def process():
-	global mag_a, mag_b, calibrate_rq
+	def reshape(self, w, h):
+		glViewport(0, 0, w, h)
+		glMatrixMode(GL_PROJECTION)
+		glLoadIdentity()
+		gluOrtho2D(0.0, w, 0.0, h)
+		glMatrixMode(GL_MODELVIEW)
 
-	while True:
-		signal = sig_input.read(bins)
-		spectrum = np.log(np.absolute(np.fft.fft(np.multiply(signal, window))))
-		spectrum = np.concatenate((spectrum[bins/2:bins], spectrum[0:bins/2]))
+		self.view.set_dimensions(w, h)
 
-		if calibrate_rq:
-			calibrate_rq = False
+	def keyboard(self, key, x, y):
+		if key == 'c':
+			self.calibrate_rq = True
 
-			a = int(((-view.origin_x) / view.scale_x + 1) / 2 * bins)
-			b = int(((-view.origin_x + view.width) / view.scale_x + 1) / 2 * bins)
+	def idle(self):
+		try:
+			while not self.wf_inserts.empty():
+				rec = self.wf_inserts.get_nowait()
+				self.multitexture.insert(self.wf_edge, rec)
 
-			a = max(0, min(bins - 1, a))
-			b = max(0, min(bins - 1, b))
+				self.wf_edge += 1
+				if self.wf_edge >= self.multitexture.get_height():
+					self.wf_edge = 0
+		except Queue.Empty:
+			return
 
-			if a != b:
-				area = spectrum[a:b]
-				mag_a = np.min(area) - 0.5
-				mag_b = np.max(area) + 1.0
+	def process(self):
+		while True:
+			signal = self.sig_input.read(self.bins)
+			spectrum = np.log(np.absolute(np.fft.fft(np.multiply(signal, self.window))))
+			spectrum = np.concatenate((spectrum[self.bins/2:self.bins],
+										spectrum[0:self.bins/2]))
 
-		scale = 2.75 / (mag_b - mag_a)
-		shift = -mag_a * scale - 1.75
+			print signal[0]
 
-		line = pysdrext.mag2col((spectrum * scale + shift).astype('f'))
-		wf_inserts.put(line)
+			if self.calibrate_rq:
+				self.calibrate_rq = False
+
+				a = int(((-self.view.origin_x) / self.view.scale_x + 1)
+						/ 2 * self.bins)
+				b = int(((-self.view.origin_x + self.view.width) / self.view.scale_x + 1)
+						/ 2 * self.bins)
+
+				a = max(0, min(self.bins - 1, a))
+				b = max(0, min(self.bins - 1, b))
+
+				if a != b:
+					area = spectrum[a:b]
+					self.mag_a = np.min(area) - 0.5
+					self.mag_b = np.max(area) + 1.0
+
+			scale = 2.75 / (self.mag_b - self.mag_a)
+			shift = -self.mag_a * scale - 1.75
+
+			line = pysdrext.mag2col((spectrum * scale + shift).astype('f'))
+			self.wf_inserts.put(line)
 
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(description='Plot live spectral waterfall of an IQ signal.')
@@ -141,9 +167,6 @@ if __name__ == "__main__":
 
 	args = parser.parse_args()
 
-	bins = args.bins
-	window = 0.5 * (1.0 - np.cos((2 * math.pi * np.arange(bins)) / bins))
-
 	if args.raw:
 		sig_input = RawSigInput(args.raw, 2, np.dtype(np.float32), sys.stdin)
 	else:
@@ -151,26 +174,9 @@ if __name__ == "__main__":
 
 	glutInit()
 	glutInitWindowSize(640, 480)
-	glutCreateWindow('PySDR')
-	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_MULTISAMPLE)
-	glutDisplayFunc(displayFun)
-	glutIdleFunc(idleFun)
-	glutMouseFunc(mouseFun)
-	glutMotionFunc(motionFun)
-	glutReshapeFunc(reshapeFun)
-	glutKeyboardFunc(keyPressedFun)
+	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA)
 
-	if bins % 1024 != 0:
-		raise NotImplementedError("bins must be multiply of 1024")
-
-	multitexture = MultiTexture(1024, 1024, bins / 1024, 4)
-	overlay = PlotOverlay(view, sig_input)
-
-	initFun()
-
-	process_t = threading.Thread(target=process)
-	process_t.start()
-
-	sig_input.start()
+	waterfall_win = WaterfallWindow(sig_input, args.bins)
+	waterfall_win.start()
 
 	glutMainLoop()
