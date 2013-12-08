@@ -21,11 +21,11 @@ void cmult(float *ai, float *aq, float bi, float bq)
 	*aq = ai_ * bq + *aq * bi;
 }
 
-void freq_shift(float *i, float *q, int n, float interval)
+void freq_shift(float *i, float *q, int n, int pos, float interval)
 {
 	int x;
 	for (x = 0; x < n; x++) {
-		float m = ((float) x) * 2 * M_PI / interval;
+		float m = ((float) (pos + x)) * 2 * M_PI / interval;
 		cmult(i + x, q + x, sin(m), cos(m));
 	}
 }
@@ -72,6 +72,8 @@ void fir(float *c, float *s, float *in, float *out, int taps, int nframes)
 float buffer_i[10000];
 float buffer_q[10000];
 
+int pos = 0;
+
 int process(jack_nframes_t nframes, void *arg)
 {
 	jack_default_audio_sample_t *in_i, *in_q, *out_i, *out_q;
@@ -87,15 +89,12 @@ int process(jack_nframes_t nframes, void *arg)
 		buffer_q[i] = in_q[i];
 	}
 
-	freq_shift(buffer_i, buffer_q, nframes, shift_down);
+	freq_shift(buffer_i, buffer_q, nframes, pos, shift_down);
 	fir(fir_c, state_i, buffer_i, out_i, 50, nframes);
 	fir(fir_c, state_q, buffer_q, out_q, 50, nframes);
-	freq_shift(out_i, out_q, nframes, shift_up);
+	freq_shift(out_i, out_q, nframes, pos, shift_up);
 
-	for (i = 0; i < nframes; i++) {
-		out_i[i] = out_i[i] * 500;
-		out_q[i] = out_q[i] * 500;
-	}
+	pos += nframes;
 
 	return 0;
 }
