@@ -1,4 +1,5 @@
 import math
+import time
 import sys
 import subprocess
 import Queue
@@ -83,7 +84,6 @@ class WaterfallWindow():
 		glPopMatrix()
 
 		glutSwapBuffers()
-		glutPostRedisplay()
 
 	def mouse(self, button, state, x, y):
 		if state == GLUT_DOWN:
@@ -114,13 +114,15 @@ class WaterfallWindow():
 
 	def idle(self):
 		try:
-			while not self.wf_inserts.empty():
-				rec = self.wf_inserts.get_nowait()
+			while True:
+				rec = self.wf_inserts.get(block = True, timeout = 0.02)
 				self.multitexture.insert(self.wf_edge, rec)
 
 				self.wf_edge += 1
 				if self.wf_edge >= self.multitexture.get_height():
 					self.wf_edge = 0
+
+				glutPostRedisplay()
 		except Queue.Empty:
 			return
 

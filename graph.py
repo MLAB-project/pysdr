@@ -31,6 +31,9 @@ class MultiTexture():
 
 		self.textures = glGenTextures(units_x * units_y)
 
+		if not isinstance(self.textures, np.ndarray):
+			self.textures = [self.textures]
+
 		for i in xrange(units_x * units_y):
 			glEnable(GL_TEXTURE_2D)
 			glBindTexture(GL_TEXTURE_2D, self.textures[i])

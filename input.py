@@ -49,7 +49,7 @@ class JackInput(SigInput):
 			if r != None:
 				return r
 
-			time.sleep(frames / self.sample_rate / 10)
+			time.sleep(float(frames) / self.sample_rate / 10)
 
 	def start(self):
 		pysdrext.jack_activate(self.handle)
