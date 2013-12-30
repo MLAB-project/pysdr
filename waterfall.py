@@ -1,5 +1,4 @@
 import math
-import time
 import sys
 import subprocess
 import Queue
@@ -19,7 +18,7 @@ sys.path.append("./pysdrext/pysdrext_directory")
 import pysdrext
 
 class WaterfallWindow():
-	def __init__(self, sig_input, bins):
+	def __init__(self, sig_input, bins, overlap = 0):
 		if bins % 1024 != 0:
 			raise NotImplementedError("number of bins must be a multiple of 1024")
 
@@ -30,6 +29,7 @@ class WaterfallWindow():
 		self.sig_input = sig_input
 		self.bins = bins
 		self.window = 0.5 * (1.0 - np.cos((2 * math.pi * np.arange(self.bins)) / self.bins))
+		self.overlap = overlap
 
 		glutCreateWindow('PySDR')
 		glutDisplayFunc(self.display)
@@ -127,8 +127,11 @@ class WaterfallWindow():
 			return
 
 	def process(self):
+		signal = np.zeros(self.bins, dtype=np.complex64)
+
 		while True:
-			signal = self.sig_input.read(self.bins)
+			signal[0:self.overlap] = signal[self.bins - self.overlap:self.bins]
+			signal[self.overlap:self.bins] = self.sig_input.read(self.bins - self.overlap)
 			spectrum = np.log(np.absolute(np.fft.fft(np.multiply(signal, self.window))))
 			spectrum = np.concatenate((spectrum[self.bins/2:self.bins],
 										spectrum[0:self.bins/2]))
@@ -158,14 +161,22 @@ class WaterfallWindow():
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(description='Plot live spectral waterfall of an IQ signal.')
 	parser.add_argument('-b', '--bins', type=int, default=4096,
-						help='number of bins')
+						help='number of bins (default: %(default)s)')
 	parser.add_argument('-j', '--jack', metavar='NAME', default='pysdr',
 						help='feed signal from JACK under the given name')
 	parser.add_argument('-r', '--raw', metavar='RATE', type=int,
 						help='feed signal from the standard input, 2 channel \
 								interleaved floats with the given samplerate')
+	parser.add_argument('-o', '--overlap', type=float, default=0.25,
+						help='overlap between consecutive windows as a proportion \
+								of the number of bins (default: %(default)s)')
 
 	args = parser.parse_args()
+
+	overlap_bins = int(args.bins * args.overlap)
+
+	if not (overlap_bins >= 0 and overlap_bins < args.bins):
+		raise ValueError("number of overlapping bins is out of bounds")
 
 	if args.raw:
 		sig_input = RawSigInput(args.raw, 2, np.dtype(np.float32), sys.stdin)
@@ -176,7 +187,7 @@ if __name__ == "__main__":
 	glutInitWindowSize(640, 480)
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA)
 
-	waterfall_win = WaterfallWindow(sig_input, args.bins)
+	waterfall_win = WaterfallWindow(sig_input, args.bins, overlap=overlap_bins)
 	waterfall_win.start()
 
 	glutMainLoop()
