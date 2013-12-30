@@ -24,7 +24,11 @@ class RawSigInput(SigInput):
 		self.file = file
 
 	def read(self, frames):
-		string = self.file.read(self.dtype.itemsize * frames * self.no_channels)
+		read_len = frames * self.dtype.itemsize * self.no_channels
+		string = ""
+
+		while len(string) < read_len:
+			string += self.file.read(read_len - len(string))
 
 		if self.no_channels == 1:
 			return np.fromstring(string, dtype=self.dtype).astype(np.float32)
