@@ -169,7 +169,7 @@ if __name__ == "__main__":
 	parser.add_argument('-r', '--raw', metavar='RATE', type=int,
 						help='feed signal from the standard input, 2 channel \
 								interleaved floats with the given samplerate')
-	parser.add_argument('-o', '--overlap', type=float, default=0.25,
+	parser.add_argument('-o', '--overlap', type=float, default=0.75,
 						help='overlap between consecutive windows as a proportion \
 								of the number of bins (default: %(default)s)')
 
