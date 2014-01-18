@@ -114,6 +114,11 @@ class WaterfallWindow():
 		if key == 'c':
 			self.calibrate_rq = True
 
+		if key == 'm':
+			self.view.set_scale(self.multitexture.get_width(), self.multitexture.get_height(),
+								self.view.width / 2, self.view.height / 2)
+			glutPostRedisplay()
+
 	def idle(self):
 		try:
 			while True:

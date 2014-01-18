@@ -32,14 +32,18 @@ class View:
 	def get_width(self):
 		return self.width
 
+	def set_scale(self, sx, sy, px, py):
+		sx, sy = float(sx), float(sy)
+		self.origin_x = (self.origin_x - px) * (sx / self.scale_x) + px
+		self.origin_y = (self.origin_y - py) * (sy / self.scale_y) + py
+		self.scale_x = sx
+		self.scale_y = sy
+
 	def drag(self, x, y):
 		if self.right_click:
-			x_c = math.pow(1.01, x - self.drag_x)
-			y_c = math.pow(1.01, y - self.drag_y)
-			self.origin_x = (self.origin_x - self.start_x) * x_c + self.start_x
-			self.origin_y = (self.origin_y - self.start_y) * y_c + self.start_y
-			self.scale_x *= x_c
-			self.scale_y *= y_c
+			self.set_scale(self.scale_x * math.pow(1.01, x - self.drag_x),
+							self.scale_y * math.pow(1.01, y - self.drag_y),
+							self.start_x, self.start_y)
 		else:
 			self.origin_x += x - self.drag_x
 			self.origin_y += y - self.drag_y
@@ -105,7 +109,7 @@ class PlotOverlay:
 		glEnd()
 
 		glColor4f(1.0, 1.0, 1.0, 1.0)
-		
+
 		glPushMatrix()
 		glLoadIdentity()
 
