@@ -50,6 +50,12 @@ class View:
 		self.drag_x = x
 		self.drag_y = y
 
+	def from_screen(self, x, y):
+		return ((x - self.origin_x) / self.scale_x, (y - self.origin_y) / self.scale_y)
+
+	def to_screen(self, x, y):
+		return (x * self.scale_x + self.origin_x, y * self.scale_y + self.origin_y)
+
 	def setup(self):
 		glTranslated(self.origin_x, self.origin_y, 0)
 		glScalef(self.scale_x, self.scale_y, 1.0)
@@ -86,6 +92,18 @@ class PlotOverlay:
 		for b in [(-6, "MHz"), (-3, "kHz"), (0, "Hz")]:
 			if l <= b[0] + 1:
 				return ("%%.%df %%s" % max(0, l - b[0])) % (x * math.pow(10, b[0]), b[1])
+
+	def draw_text(self, x, y, text):
+		glPushMatrix()
+		glLoadIdentity()
+
+		(sx, sy) = self.view.to_screen(x, y)
+		#self.font.glPrint(int(sx), int(sy), text)
+		glRasterPos2i(int(sx), int(sy))
+		for c in text:
+			glutBitmapCharacter(GLUT_BITMAP_8_BY_13, ord(c))
+
+		glPopMatrix()
 
 	def draw(self):
 		x_a = -self.view.origin_x / self.view.scale_x

@@ -2,7 +2,6 @@
 
 import math
 import sys
-import subprocess
 import Queue
 import threading
 import numpy as np
@@ -18,6 +17,22 @@ from overlay import *
 
 sys.path.append("./pysdrext/pysdrext_directory")
 import pysdrext
+
+class Detector():
+	@staticmethod
+	def peak(a, b, s):
+		return (np.max(s[a:b]), np.argmax(s[a:b]) + a)
+
+	@staticmethod
+	def noise(a):
+		return np.sort(a)[len(a)/4] + np.log(2)
+
+	def __init__(self, file, wf_win):
+		self.__dict__['mark'] = wf_win.add_mark
+		self.__dict__['noise'] = self.noise
+		self.__dict__['peak'] = self.peak
+		self.__dict__['freq2bin'] = lambda x: int(x * wf_win.bins / wf_win.sig_input.sample_rate + wf_win.bins / 2)
+		execfile(file, self.__dict__)
 
 class WaterfallWindow():
 	def __init__(self, sig_input, bins, overlap = 0):
@@ -51,18 +66,20 @@ class WaterfallWindow():
 		self.console_active = False
 
 		self.wf_inserts = Queue.Queue()
+		self.wf_rows_sum = 0
 		self.wf_edge = 0
 
 		self.process_t = threading.Thread(target=self.process)
 		self.process_t.setDaemon(True)
 		self.process_t.start()
 
+		self.detectors = []
+		self.marks = []
+
 	def start(self):
 		self.sig_input.start()
 
 	def init(self):
-		glClearColor(0.0, 0.0, 0.0, 0.0)
-		glColor3f(0.0, 0.0, 0.0)
 		glLineWidth(1.0)
 		glEnable(GL_BLEND)
 
@@ -83,9 +100,23 @@ class WaterfallWindow():
 
 		self.overlay.draw()
 
+		glColor3f(1.0, 1.0, 1.0)
+
+		row_size = 1.0 / self.multitexture.get_height()
+		for mark in self.marks:
+			self.overlay.draw_text(mark[0], 1.0 + row_size * (mark[1] - self.wf_rows_sum), mark[2])
+
 		glPopMatrix()
 
 		glutSwapBuffers()
+
+	def add_mark(self, row, bin, text):
+		self.marks.append((float(bin) / self.bins * 2 - 1,
+							row, text))
+
+	def clean_marks(self):
+		pitfall = self.wf_rows_sum - self.multitexture.get_height()
+		self.marks = [x for x in self.marks if not x[1] < pitfall]
 
 	def mouse(self, button, state, x, y):
 		if state == GLUT_DOWN:
@@ -125,9 +156,9 @@ class WaterfallWindow():
 				rec = self.wf_inserts.get(block = True, timeout = 0.02)
 				self.multitexture.insert(self.wf_edge, rec)
 
-				self.wf_edge += 1
-				if self.wf_edge >= self.multitexture.get_height():
-					self.wf_edge = 0
+				self.wf_rows_sum += 1
+				self.wf_edge = self.wf_rows_sum % self.multitexture.get_height()
+				self.clean_marks()
 
 				glutPostRedisplay()
 		except Queue.Empty:
@@ -135,6 +166,7 @@ class WaterfallWindow():
 
 	def process(self):
 		signal = np.zeros(self.bins, dtype=np.complex64)
+		iteration = 0
 
 		while True:
 			signal[0:self.overlap] = signal[self.bins - self.overlap:self.bins]
@@ -142,6 +174,12 @@ class WaterfallWindow():
 			spectrum = np.log(np.absolute(np.fft.fft(np.multiply(signal, self.window))))
 			spectrum = np.concatenate((spectrum[self.bins/2:self.bins],
 										spectrum[0:self.bins/2]))
+
+			for detector in self.detectors:
+				try:
+					detector.run(iteration, spectrum)
+				except Exception as e:
+					print e
 
 			if self.calibrate_rq:
 				self.calibrate_rq = False
@@ -163,6 +201,7 @@ class WaterfallWindow():
 			shift = -self.mag_a * scale - 1.75
 
 			line = pysdrext.mag2col((spectrum * scale + shift).astype('f'))
+			iteration = iteration + 1
 			self.wf_inserts.put(line)
 
 if __name__ == "__main__":
@@ -195,6 +234,7 @@ if __name__ == "__main__":
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA)
 
 	waterfall_win = WaterfallWindow(sig_input, args.bins, overlap=overlap_bins)
+	waterfall_win.detectors = [Detector("detector.py", waterfall_win)]
 	waterfall_win.start()
 
 	glutMainLoop()
