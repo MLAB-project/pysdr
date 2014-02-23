@@ -12,34 +12,30 @@ Jack sink waterfall with OpenGL acceleration. This software plot live waterfall 
 
 ## Dependencies 
 
-Python
-python-opengl
-python-dev
-jack-stdio
-
+* python
+* python-opengl
+* python-dev
+* python-numpy
+* libjack-dev
 
 ### Ubuntu 13.04
 
- sudo apt-get install python-numpy python-opengl python-dev libjack-jackd2-dev
+    $ sudo apt-get install python-numpy python-opengl python-dev libjack-jackd2-dev
 
 
 ## Howto
 
 ### Compiling
 
-1. cd to project in pysdrext/ directory
+In the root directory of this repository:
 
-2. python setup.py
-
-3. perform option 3. (pres enter two times) 
-
-4. python ../waterfall.py
+    $ python setup.py build_ext --inplace
 
 ### Running
 
 Start qjackctl, run jack daemon and then run pySDR:
 
-python waterfall.py
+    $ python waterfall.py
 
 ## License
 
