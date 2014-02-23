@@ -2,10 +2,10 @@ def configuration(parent_package='', top_path=None):
     import numpy
     from numpy.distutils.misc_util import Configuration
 
-    config = Configuration('pysdrext_directory',
+    config = Configuration('.',
                            parent_package,
                            top_path)
-    config.add_extension('pysdrext', ['pysdr.c'], libraries=['jack'])
+    config.add_extension('ext', ['pysdrext/pysdr.c'], libraries=['jack'])
 
     return config
 

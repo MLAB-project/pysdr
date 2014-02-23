@@ -1,27 +1,29 @@
 import numpy as np
 
-iter_time = float(freq2bin(1000) - freq2bin(0)) / 1000
 avg_spread_bin = freq2bin(100) - freq2bin(0)
+timeout_nrows = int(1.6 / row_duration)
 
-state = None
+echo_ongoing = False
 last_detect_row = None
 
 def run(row, spectrum):
-	global state, last_detect_row
+	global echo_ongoing, last_detect_row
 
 	(peak_pow, peak_bin) = peak(freq2bin(10300), freq2bin(10900), spectrum)
 	avg_pow = np.average(spectrum[peak_bin - avg_spread_bin:peak_bin + avg_spread_bin])
 	noise_pow = noise(spectrum[freq2bin(9000):freq2bin(9600)])
 
-	print "noise_pow: %f avg_pow: %f sn: %f" % (noise_pow, avg_pow, avg_pow - noise_pow)
+	sn = np.log(avg_pow / noise_pow)
+	plot("sn", sn)
 
-	if avg_pow - noise_pow > 0.1:
+	if sn > 0.5:
 		last_detect_row = row
-		if state == None:
-			print "METEOR"
-			mark(row, peak_bin, "METEOR")
-			state = ("METEOR", peak_bin)
-	elif state != None and (row - last_detect_row) * iter_time > 1.6:
-		print "END"
-		mark(row, state[1], "END")
-		state = None
+		cut(row + timeout_nrows)
+		if not echo_ongoing:
+			event((row - int(0.5 / row_duration), row + timeout_nrows),
+					(peak_bin - avg_spread_bin, peak_bin + avg_spread_bin),
+					"@ %.3f kHz" % (bin2freq(peak_bin) / 1000))
+			echo_ongoing = True
+	elif echo_ongoing and (row - last_detect_row) > timeout_nrows:
+		final()
+		echo_ongoing = False

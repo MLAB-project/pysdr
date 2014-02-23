@@ -2,8 +2,7 @@ import numpy as np
 import time
 import sys
 
-sys.path.append("./pysdrext/pysdrext_directory")
-import pysdrext
+import ext
 
 class SigInput:
 	def __init__(self):
@@ -43,12 +42,12 @@ class RawSigInput(SigInput):
 class JackInput(SigInput):
 	def __init__(self, name):
 		self.name = name
-		self.handle = pysdrext.jack_init(name)
-		self.sample_rate = pysdrext.jack_get_sample_rate(self.handle)
+		self.handle = ext.jack_init(name)
+		self.sample_rate = ext.jack_get_sample_rate(self.handle)
 
 	def read(self, frames):
 		while True:
-			r = pysdrext.jack_gather_samples(self.handle, frames)
+			r = ext.jack_gather_samples(self.handle, frames)
 
 			if r != None:
 				return r
@@ -56,4 +55,4 @@ class JackInput(SigInput):
 			time.sleep(float(frames) / self.sample_rate / 10)
 
 	def start(self):
-		pysdrext.jack_activate(self.handle)
+		ext.jack_activate(self.handle)

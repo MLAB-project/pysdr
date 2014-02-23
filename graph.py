@@ -10,14 +10,29 @@ class PlotLine:
 		self.points = points
 		self.array = np.zeros((self.points, 2), 'f')
 		self.data = self.array[:,1]
-
-		for i in range(self.points):
-			self.array[i][0] = float(i) / (points - 1)
+		self.array[:,0] = np.arange(self.points, dtype=np.float) / (self.points - 1)
 
 	def draw(self):
 		glEnableClientState(GL_VERTEX_ARRAY)
 		glVertexPointer(2, GL_FLOAT, 0, self.array)
 		glDrawArrays(GL_LINE_STRIP, 0, self.points)
+		glDisableClientState(GL_VERTEX_ARRAY)
+
+	def draw_scroll(self, edge):
+		glEnableClientState(GL_VERTEX_ARRAY)
+
+		glVertexPointer(2, GL_FLOAT, 0, self.array)
+
+		glPushMatrix()
+		glTranslatef(1.0 - float(edge) / self.points, 0, 0)
+		glDrawArrays(GL_LINE_STRIP, 0, edge)
+		glPopMatrix()
+
+		glPushMatrix()
+		glTranslatef(-float(edge) / self.points, 0, 0)
+		glDrawArrays(GL_LINE_STRIP, edge, self.points - edge)
+		glPopMatrix()
+
 		glDisableClientState(GL_VERTEX_ARRAY)
 
 class MultiTexture():
@@ -34,13 +49,15 @@ class MultiTexture():
 		if not isinstance(self.textures, np.ndarray):
 			self.textures = [self.textures]
 
+		init_image = np.zeros(self.unit_width * self.unit_height * 3)
+
 		for i in xrange(units_x * units_y):
 			glEnable(GL_TEXTURE_2D)
 			glBindTexture(GL_TEXTURE_2D, self.textures[i])
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, self.unit_width,
-							self.unit_height, 0, GL_RGB, GL_BYTE, 0)
+							self.unit_height, 0, GL_RGB, GL_BYTE, init_image)
 
 	def get_width(self):
 		return self.units_x * self.unit_width
@@ -101,7 +118,7 @@ class MultiTexture():
 			for x in xrange(self.units_x):
 				glBindTexture(GL_TEXTURE_2D, self.textures[self.units_x * row + x])
 				xa, xb = (float(x) / self.units_x), (float(x + 1) / self.units_x)
-	
+
 				glBegin(GL_QUADS)
 				glTexCoord2f(0, tya)
 				glVertex2f(xa, ya)
@@ -118,7 +135,7 @@ class MultiTexture():
 			for x in xrange(self.units_x):
 				glBindTexture(GL_TEXTURE_2D, self.textures[self.units_x * row + x])
 				xa, xb = (float(x) / self.units_x), (float(x + 1) / self.units_x)
-	
+
 				glBegin(GL_QUADS)
 				glTexCoord2f(0, tya)
 				glVertex2f(xa, ya)
@@ -136,7 +153,7 @@ class MultiTexture():
 			for x in xrange(self.units_x):
 				glBindTexture(GL_TEXTURE_2D, self.textures[self.units_x * row + x])
 				xa, xb = (float(x) / self.units_x), (float(x + 1) / self.units_x)
-	
+
 				glBegin(GL_QUADS)
 				glTexCoord2f(0, 0)
 				glVertex2f(xa, ya)
@@ -155,7 +172,7 @@ class MultiTexture():
 
 		for y in xrange(self.units_y):
 			self.draw_row(edge, y)
-		
+
 		glDisable(GL_TEXTURE_2D)
 
 class WaterfallFlat():

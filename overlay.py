@@ -6,8 +6,6 @@ from OpenGL.GL import *
 from OpenGL.GLUT import *
 from OpenGL.GLU import *
 
-import glFreeType
-
 class View:
 	def __init__(self):
 		self.scale_x = 640.0
@@ -15,22 +13,15 @@ class View:
 		self.origin_x = 0.0
 		self.origin_y = 0.0
 
-	def click(self, right_click, x, y):
-		self.right_click = right_click
+	def on_mouse_button(self, button, state, x, y):
+		if state != GLUT_DOWN:
+			return
+
+		self.button_right = button == GLUT_RIGHT_BUTTON
 		self.start_x = x
 		self.start_y = y
 		self.drag_x = x
 		self.drag_y = y
-
-	def set_dimensions(self, w, h):
-		self.width = w
-		self.height = h
-
-	def get_height(self):
-		return self.height
-
-	def get_width(self):
-		return self.width
 
 	def set_scale(self, sx, sy, px, py):
 		sx, sy = float(sx), float(sy)
@@ -39,8 +30,8 @@ class View:
 		self.scale_x = sx
 		self.scale_y = sy
 
-	def drag(self, x, y):
-		if self.right_click:
+	def on_drag(self, x, y):
+		if self.button_right:
 			self.set_scale(self.scale_x * math.pow(1.01, x - self.drag_x),
 							self.scale_y * math.pow(1.01, y - self.drag_y),
 							self.start_x, self.start_y)
@@ -62,9 +53,8 @@ class View:
 
 
 class PlotOverlay:
-	def __init__(self, view, sig_input):
-		self.font = glFreeType.font_data("font.ttf", 10)
-		self.view = view
+	def __init__(self, viewer, sig_input):
+		self.viewer = viewer
 		self.sig_input = sig_input
 
 	@staticmethod
@@ -93,24 +83,28 @@ class PlotOverlay:
 			if l <= b[0] + 1:
 				return ("%%.%df %%s" % max(0, l - b[0])) % (x * math.pow(10, b[0]), b[1])
 
+	def draw_text_ss(self, x, y, text):
+		glRasterPos2i(int(x), int(y))
+		for c in text:
+			glutBitmapCharacter(GLUT_BITMAP_8_BY_13, ord(c))
+
 	def draw_text(self, x, y, text):
 		glPushMatrix()
 		glLoadIdentity()
 
-		(sx, sy) = self.view.to_screen(x, y)
-		#self.font.glPrint(int(sx), int(sy), text)
-		glRasterPos2i(int(sx), int(sy))
-		for c in text:
-			glutBitmapCharacter(GLUT_BITMAP_8_BY_13, ord(c))
+		(sx, sy) = self.viewer.view.to_screen(x, y)
+		self.draw_text_ss(sx + 5, sy + 5, text)
 
 		glPopMatrix()
 
-	def draw(self):
-		x_a = -self.view.origin_x / self.view.scale_x
-		x_b = x_a + self.view.get_width() / self.view.scale_x
+	def draw_content(self):
+		view = self.viewer.view
 
-		y_a = -self.view.origin_y / self.view.scale_y
-		y_b = y_a + self.view.get_height() / self.view.scale_y
+		x_a = -view.origin_x / view.scale_x
+		x_b = x_a + self.viewer.screen_size[0] / view.scale_x
+
+		y_a = -view.origin_y / view.scale_y
+		y_b = y_a + self.viewer.screen_size[1] / view.scale_y
 
 		bw = self.sig_input.sample_rate / 2
 
@@ -132,8 +126,8 @@ class PlotOverlay:
 		glLoadIdentity()
 
 		for x in marks:
-			self.font.glPrint(((x/bw - x_a) / (x_b - x_a)) * self.view.get_width() + 5, 5,
-				self.format_freq(x, base))
+			self.draw_text_ss(((x/bw - x_a) / (x_b - x_a)) * self.viewer.screen_size[0] + 5, 5,
+								self.format_freq(x, base))
 
 		glPopMatrix()
 

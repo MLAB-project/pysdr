@@ -120,8 +120,8 @@ static PyObject *pysdr_jack_gather_samples(PyObject *self, PyObject *args)
         Py_INCREF(Py_None);
         return Py_None;
     }
-
-    float *samples = (float *) malloc(sizeof(float) * 2 * frames_no);
+    
+    float *samples = (float *) PyDataMem_NEW(sizeof(float) * 2 * frames_no);
 
     int read = 0;
     while (read < frames_no)
@@ -130,7 +130,9 @@ static PyObject *pysdr_jack_gather_samples(PyObject *self, PyObject *args)
 
     npy_intp dims[1] = { frames_no };
     PyObject *array = PyArray_SimpleNewFromData(1, dims, NPY_COMPLEX64, samples);
+
     ((PyArrayObject *) array)->flags |= NPY_OWNDATA; 
+
     return array;
 }
 
@@ -222,7 +224,7 @@ static PyMethodDef pysdrextMethods[] = {
 #if PY_VERSION_HEX >= 0x03000000
 static struct PyModuleDef moduledef = {
     PyModuleDef_HEAD_INIT,
-    "pysdrext",
+    "ext",
     NULL,
     -1,
     pysdrextMethods,
@@ -232,7 +234,7 @@ static struct PyModuleDef moduledef = {
     NULL
 };
 
-PyMODINIT_FUNC PyInit_pysdrext(void)
+PyMODINIT_FUNC PyInit_ext(void)
 {
     PyObject *m, *mag2col, *d;
 
@@ -256,11 +258,11 @@ PyMODINIT_FUNC PyInit_pysdrext(void)
     return m;
 }
 #else
-PyMODINIT_FUNC initpysdrext(void)
+PyMODINIT_FUNC initext(void)
 {
     PyObject *m, *mag2col, *d;
 
-    m = Py_InitModule("pysdrext", pysdrextMethods);
+    m = Py_InitModule("ext", pysdrextMethods);
 
     if (!m)
         return;
