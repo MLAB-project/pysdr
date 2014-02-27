@@ -433,7 +433,7 @@ class WaterfallWindow(Viewer):
 
 		if key == 'm':
 			self.view.set_scale(self.multitexture.get_width(), self.multitexture.get_height(),
-								self.view.width / 2, self.view.height / 2)
+								self.screen_size[0] / 2, self.screen_size[1] / 2)
 			glutPostRedisplay()
 
 
