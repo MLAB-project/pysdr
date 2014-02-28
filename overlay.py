@@ -51,7 +51,6 @@ class View:
 		glTranslated(self.origin_x, self.origin_y, 0)
 		glScalef(self.scale_x, self.scale_y, 1.0)
 
-
 class PlotOverlay:
 	def __init__(self, viewer, sig_input):
 		self.viewer = viewer
@@ -80,7 +79,7 @@ class PlotOverlay:
 		l = int(math.ceil(math.log(base, 0.1)))
 
 		for b in [(-6, "MHz"), (-3, "kHz"), (0, "Hz")]:
-			if l <= b[0] + 1:
+			if l <= b[0] + 1 or b[0] == 0:
 				return ("%%.%df %%s" % max(0, l - b[0])) % (x * math.pow(10, b[0]), b[1])
 
 	def draw_text_ss(self, x, y, text):
