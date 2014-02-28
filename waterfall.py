@@ -200,13 +200,17 @@ class EventMarker():
 			xa, xb = [self.viewer.bin_to_x(x) for x in freq_range]
 			ya, yb = [self.viewer.row_to_y(x) for x in row_range]
 			
-			glColor4f(1.0, 1.0, 1.0, 0.3)
+			glLineWidth(2)
+			glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
+			glColor4f(0.0, 1.0, 0.0, 1.0)
 			glBegin(GL_QUADS)
 			glVertex2f(xa, ya)
 			glVertex2f(xa, yb)
 			glVertex2f(xb, yb)
 			glVertex2f(xb, ya)
 			glEnd()
+			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
+			glLineWidth(1)
 
 			glColor4f(1.0, 1.0, 1.0, 1.0)
 			self.viewer.overlay.draw_text(xb, ya, description)
