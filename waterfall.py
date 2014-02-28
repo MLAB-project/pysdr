@@ -14,6 +14,7 @@ from OpenGL.GLU import *
 from graph import *
 from input import *
 from overlay import *
+from console import *
 
 import ext
 
@@ -88,6 +89,10 @@ class Viewer:
 		glMatrixMode(GL_MODELVIEW)
 
 		self.screen_size = (w, h)
+
+		for layer in self.layers:
+			if hasattr(layer.__class__, 'on_resize'):
+				layer.on_resize(w, h)
 
 	def cb_keyboard(self, key, x, y):
 		for layer in reversed(self.layers):
@@ -381,7 +386,8 @@ class WaterfallWindow(Viewer):
 		event_marker = EventMarker(self)
 		detector_script = DetectorScript(self, event_marker, "detector.py")
 		self.layers = self.layers + [event_marker, detector_script,
-										self.overlay, RangeSelector(self)]
+										self.overlay, RangeSelector(self),
+										Console(self, globals())]
 
 		self.texture_inserts = Queue.Queue()
 		self.texture_edge = 0
@@ -516,7 +522,7 @@ if __name__ == "__main__":
 	glutInitWindowSize(640, 480)
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA)
 
-	waterfall_win = WaterfallWindow(sig_input, args.bins, overlap=overlap_bins)
-	waterfall_win.start()
+	viewer = WaterfallWindow(sig_input, args.bins, overlap=overlap_bins)
+	viewer.start()
 
 	glutMainLoop()
