@@ -138,6 +138,21 @@ class TemporalPlot(PlotLine):
 	def set(self, row, value):
 		self.data[row % self.points] = value
 
+class TemporalFreqPlot(TemporalPlot):
+	def __init__(self, viewer, title):
+		TemporalPlot.__init__(self, viewer, 0, title)
+
+	def draw_screen(self):
+		glPushMatrix()
+		self.viewer.view.setup()
+
+		glColor4f(1.0, 1.0, 1.0, 1.0)
+		glScalef(-1, 1, 1)
+		glRotatef(90, 0, 0, 1)
+		PlotLine.draw_scroll(self, self.viewer.texture_edge)
+
+		glPopMatrix()
+
 class DetectorScript():
 	@staticmethod
 	def peak(a, b, s):
@@ -156,24 +171,39 @@ class DetectorScript():
 
 	def plot(self, name, value):
 		if not name in self.plots:
-			self.plots[name] = TemporalPlot(self.viewer, 100 + 120 * len(self.plots), name)
+			self.plots[name] = TemporalPlot(self.viewer, self.plot_x_offset, name)
+			self.plot_x_offset = self.plot_x_offset + 120
 
 		self.plots[name].set(self.viewer.process_row, value)
+
+	def plot_bin(self, name, value):
+		if not name in self.plots:
+			self.plots[name] = TemporalFreqPlot(self.viewer, name)
+
+		self.plots[name].set(self.viewer.process_row, (float(value) / self.viewer.bins) * 2 - 1)
 
 	def __init__(self, viewer, event_marker, file):
 		self.viewer = viewer
 		self.event_marker = event_marker
 		self.plots = dict()
+		self.plot_x_offset = 100
 
-		self.__dict__['final'] = event_marker.final
-		self.__dict__['event'] = event_marker.mark
-		self.__dict__['plot'] = self.plot
-		self.__dict__['cut'] = self.cut
-		self.__dict__['noise'] = self.noise
-		self.__dict__['peak'] = self.peak
 		self.__dict__['freq2bin'] = lambda x: int(x * viewer.bins / viewer.sig_input.sample_rate + viewer.bins / 2)
 		self.__dict__['bin2freq'] = lambda x: float(x - viewer.bins / 2) / viewer.bins * viewer.sig_input.sample_rate
 		self.__dict__['row_duration'] = float(viewer.bins - viewer.overlap) / viewer.sig_input.sample_rate
+
+		self.__dict__['final'] = event_marker.final
+		self.__dict__['event'] = event_marker.mark
+		self.__dict__['cut'] = self.cut
+
+		self.__dict__['plot'] = self.plot
+		self.__dict__['plot_bin'] = self.plot_bin
+		self.__dict__['plot_freq'] = lambda name, x: self.plot_bin(name, \
+																	self.__dict__['freq2bin'](x))
+
+		self.__dict__['noise'] = self.noise
+		self.__dict__['peak'] = self.peak
+
 		execfile(file, self.__dict__)
 
 	def draw_screen(self):
