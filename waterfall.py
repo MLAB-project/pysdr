@@ -476,7 +476,6 @@ class WaterfallWindow(Viewer):
 								self.screen_size[0] / 2, self.screen_size[1] / 2)
 			glutPostRedisplay()
 
-
 	def process(self):
 		signal = np.zeros(self.bins, dtype=np.complex64)
 
@@ -510,7 +509,10 @@ class WaterfallWindow(Viewer):
 
 				if a != b:
 					area = spectrum[a:b]
-					self.mag_range = (np.min(area) + 0.5, np.max(area) + 1.0)
+					mag_range = (np.min(area) + 0.5, np.max(area) + 1.0)
+
+					if [math.isnan(a) or math.isinf(a) for a in mag_range] == [False, False]:
+						self.mag_range = mag_range
 
 			try:
 				scale = 3.75 / (self.mag_range[1] - self.mag_range[0])
