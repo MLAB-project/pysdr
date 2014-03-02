@@ -15,6 +15,7 @@ from graph import *
 from input import *
 from overlay import *
 from console import *
+from commands import make_commands_layer
 
 import ext
 
@@ -36,6 +37,17 @@ class Viewer:
 	def init(self):
 		pass
 
+	def call_layers(self, method, args=()):
+		for layer in list(self.layers):
+			if hasattr(layer.__class__, method):
+				getattr(layer, method)(*args)
+
+	def call_layers_handler(self, method, args=()):
+		for layer in list(reversed(self.layers)):
+			if hasattr(layer.__class__, method):
+				if getattr(layer, method)(*args):
+					break
+
 	def cb_display(self):
 		glClear(GL_COLOR_BUFFER_BIT)
 		glClearColor(0, 0, 0, 1)
@@ -43,16 +55,10 @@ class Viewer:
 
 		glPushMatrix()
 		self.view.setup()
-
-		for layer in self.layers:
-			if hasattr(layer.__class__, 'draw_content'):
-				layer.draw_content()
-
+		self.call_layers('draw_content')
 		glPopMatrix()
 
-		for layer in self.layers:
-			if hasattr(layer.__class__, 'draw_screen'):
-				layer.draw_screen()
+		self.call_layers('draw_screen')
 
 		glutSwapBuffers()
 
@@ -61,12 +67,9 @@ class Viewer:
 			self.buttons_pressed.append(button)
 
 		if state == GLUT_UP:
-			self.buttons_pressed = [x for x in self.buttons_pressed if x != button]
+			self.buttons_pressed.remove(button)
 
-		for layer in reversed(self.layers):
-			if hasattr(layer.__class__, 'on_mouse_button'):
-				if layer.on_mouse_button(button, state, x, self.screen_size[1] - y):
-					break
+		self.call_layers_handler('on_mouse_button', (button, state, x, self.screen_size[1] - y))
 
 		glutPostRedisplay()
 
@@ -74,10 +77,7 @@ class Viewer:
 		if len(self.buttons_pressed) == 0:
 			return
 
-		for layer in reversed(self.layers):
-			if hasattr(layer.__class__, 'on_drag'):
-				if layer.on_drag(x, self.screen_size[1] - y):
-					break
+		self.call_layers_handler('on_drag', (x, self.screen_size[1] - y))
 
 		glutPostRedisplay()
 
@@ -90,15 +90,10 @@ class Viewer:
 
 		self.screen_size = (w, h)
 
-		for layer in self.layers:
-			if hasattr(layer.__class__, 'on_resize'):
-				layer.on_resize(w, h)
+		self.call_layers('on_resize', (w, h))
 
 	def cb_keyboard(self, key, x, y):
-		for layer in reversed(self.layers):
-			if hasattr(layer.__class__, 'on_key_press'):
-				if layer.on_key_press(key):
-					return
+		self.call_layers_handler('on_key_press', (key))
 
 	def get_layer(self, type):
 		a = [a for a in self.layers if a.__class__ == type]
@@ -143,14 +138,15 @@ class TemporalFreqPlot(TemporalPlot):
 		TemporalPlot.__init__(self, viewer, 0, title)
 
 	def draw_screen(self):
-		glPushMatrix()
-		self.viewer.view.setup()
+		pass
 
+	def draw_content(self):
 		glColor4f(1.0, 1.0, 1.0, 1.0)
+
+		glPushMatrix()
 		glScalef(-1, 1, 1)
 		glRotatef(90, 0, 0, 1)
 		PlotLine.draw_scroll(self, self.viewer.texture_edge)
-
 		glPopMatrix()
 
 class DetectorScript():
@@ -208,7 +204,13 @@ class DetectorScript():
 
 	def draw_screen(self):
 		for plot in self.plots.values():
-			plot.draw_screen()
+			if hasattr(plot.__class__, 'draw_screen'):
+				plot.draw_screen()
+
+	def draw_content(self):
+		for plot in self.plots.values():
+			if hasattr(plot.__class__, 'draw_content'):
+				plot.draw_content()
 
 	def on_lin_spectrum(self, spectrum):
 		self.run(self.viewer.process_row, spectrum)
@@ -394,16 +396,14 @@ class RangeSelector():
 			return False
 
 class WaterfallWindow(Viewer):
-	def __init__(self, sig_input, bins, overlap = 0):
+	def __init__(self, sig_input, bins, overlap=0):
 		if bins % 1024 != 0:
 			raise NotImplementedError("number of bins must be a multiple of 1024")
 
 		Viewer.__init__(self, "PySDR")
 		glutIdleFunc(self.cb_idle)
-		self.init()
 
 		self.mag_range = (-45, 5)
-		self.calibrate_rq = False
 
 		self.sig_input = sig_input
 		self.bins = bins
@@ -417,6 +417,7 @@ class WaterfallWindow(Viewer):
 		detector_script = DetectorScript(self, event_marker, "detector.py")
 		self.layers = self.layers + [event_marker, detector_script,
 										self.overlay, RangeSelector(self),
+										make_commands_layer(self),
 										Console(self, globals())]
 
 		self.texture_inserts = Queue.Queue()
@@ -425,12 +426,12 @@ class WaterfallWindow(Viewer):
 		self.texture_row = 0
 		self.process_row = 0
 
-		self.process_t = threading.Thread(target=self.process)
-		self.process_t.setDaemon(True)
-		self.process_t.start()
+		self.process_thread = threading.Thread(target=self.process)
+		self.process_thread.setDaemon(True)
 
 	def start(self):
 		self.sig_input.start()
+		self.process_thread.start()
 
 	def init(self):
 		glLineWidth(1.0)
@@ -458,23 +459,11 @@ class WaterfallWindow(Viewer):
 				self.texture_row = self.texture_row + 1
 				self.texture_edge = self.texture_row % self.multitexture.get_height()
 
-				for layer in self.layers:
-					if hasattr(layer.__class__, 'on_texture_insert'):
-						layer.on_texture_insert()
+				self.call_layers('on_texture_insert')
 
 				glutPostRedisplay()
 		except Queue.Empty:
 			return
-
-	def on_key_press(self, key):
-		if key == 'c':
-			self.calibrate_rq = True
-			return True
-
-		if key == 'm':
-			self.view.set_scale(self.multitexture.get_width(), self.multitexture.get_height(),
-								self.screen_size[0] / 2, self.screen_size[1] / 2)
-			glutPostRedisplay()
 
 	def process(self):
 		signal = np.zeros(self.bins, dtype=np.complex64)
@@ -486,33 +475,9 @@ class WaterfallWindow(Viewer):
 			spectrum = np.absolute(np.fft.fft(np.multiply(signal, self.window)))
 			spectrum = np.concatenate((spectrum[self.bins/2:self.bins], spectrum[0:self.bins/2]))
 
-			for layer in reversed(self.layers):
-				if hasattr(layer.__class__, 'on_lin_spectrum'):
-					layer.on_lin_spectrum(spectrum)
-
+			self.call_layers('on_lin_spectrum', (spectrum,))
 			spectrum = np.log10(spectrum) * 10
-
-			for layer in reversed(self.layers):
-				if hasattr(layer.__class__, 'on_log_spectrum'):
-					layer.on_log_spectrum(spectrum)
-
-			if self.calibrate_rq:
-				self.calibrate_rq = False
-
-				a = int(((-self.view.origin_x) / self.view.scale_x + 1)
-						/ 2 * self.bins)
-				b = int(((-self.view.origin_x + self.screen_size[0]) / self.view.scale_x + 1)
-						/ 2 * self.bins)
-
-				a = max(0, min(self.bins - 1, a))
-				b = max(0, min(self.bins - 1, b))
-
-				if a != b:
-					area = spectrum[a:b]
-					mag_range = (np.min(area) + 0.5, np.max(area) + 1.0)
-
-					if [math.isnan(a) or math.isinf(a) for a in mag_range] == [False, False]:
-						self.mag_range = mag_range
+			self.call_layers('on_log_spectrum', (spectrum,))
 
 			try:
 				scale = 3.75 / (self.mag_range[1] - self.mag_range[0])

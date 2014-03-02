@@ -14,7 +14,7 @@ class Console(InteractiveConsole):
 
 	@staticmethod
 	def draw_string(x, y, string):
-		glRasterPos2i(x, y)
+		glWindowPos2i(x, y)
 		for c in string:
 			glutBitmapCharacter(GLUT_BITMAP_8_BY_13, ord(c))
 

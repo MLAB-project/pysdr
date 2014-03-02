@@ -83,7 +83,7 @@ class PlotOverlay:
 				return ("%%.%df %%s" % max(0, l - b[0])) % (x * math.pow(10, b[0]), b[1])
 
 	def draw_text_ss(self, x, y, text):
-		glRasterPos2i(int(x), int(y))
+		glWindowPos2i(int(x), int(y))
 		for c in text:
 			glutBitmapCharacter(GLUT_BITMAP_8_BY_13, ord(c))
 
