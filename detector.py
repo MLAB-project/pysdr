@@ -5,6 +5,7 @@ timeout_nrows = int(1.6 / row_duration)
 
 echo_ongoing = False
 last_detect_row = None
+meteor_treshold = 0.7
 
 def run(row, spectrum):
 	global echo_ongoing, last_detect_row
@@ -16,7 +17,7 @@ def run(row, spectrum):
 	sn = np.log(avg_pow / noise_pow)
 	plot("sn", sn)
 
-	if sn > 0.5:
+	if sn > meteor_treshold:
 		last_detect_row = row
 		cut(row + timeout_nrows)
 		if not echo_ongoing:
