@@ -32,7 +32,7 @@ int process(jack_nframes_t nframes, void *arg)
 
 int main(int narg, char **args)
 {
-	if ((client = jack_client_new("midi_cmd") == 0) {
+	if ((client = jack_client_new("midi_cmd")) == 0) {
 		fprintf(stderr, "jack server not running?\n");
 		return 1;
 	}
