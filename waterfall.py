@@ -16,7 +16,7 @@ from input import *
 from overlay import *
 from console import *
 from commands import make_commands_layer
-from events import EventMarker, DetectorScript
+from events import EventMarker, DetectorScript, MIDIEventHandler
 
 import ext
 
@@ -265,7 +265,9 @@ class WaterfallWindow(Viewer):
         self.layers = self.layers + [event_marker, detector_script,
                                         self.overlay, RangeSelector(self),
                                         make_commands_layer(self),
-                                        Console(self, globals())]
+                                        Console(self, globals())] \
+                                    + [MIDIEventHandler(self, event_marker)] \
+                                    if sig_input.__class__ == JackInput else []
 
         self.texture_inserts = Queue.Queue()
         self.texture_edge = 0
@@ -291,6 +293,12 @@ class WaterfallWindow(Viewer):
         glScalef(2.0, 1.0, 1.0)
         self.multitexture.draw_scroll(self.texture_edge)
         glPopMatrix()
+
+    def freq_to_bin(self, freq):
+        return int(freq * self.bins / self.sig_input.sample_rate + self.bins / 2)
+
+    def bin_to_freq(self, bin):
+        return float(bin - self.bins / 2) / self.bins * self.sig_input.sample_rate
 
     def bin_to_x(self, bin):
         return float(bin) / self.bins * 2 - 1

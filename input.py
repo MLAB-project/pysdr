@@ -54,5 +54,18 @@ class JackInput(SigInput):
 
             time.sleep(float(frames) / self.sample_rate / 10)
 
+    def get_midi_events(self):
+        events = []
+
+        while True:
+            event = ext.jack_gather_midi_event(self.handle)
+
+            if event == None:
+                break
+            
+            events.append(event)
+
+        return events
+
     def start(self):
         ext.jack_activate(self.handle)

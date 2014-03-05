@@ -5,11 +5,15 @@
 #include "numpy/halffloat.h"
 #include <jack/jack.h>
 #include <jack/ringbuffer.h>
+#include <jack/midiport.h>
 
 typedef struct {
     jack_client_t *client;
     jack_port_t *port_i, *port_q;
+    jack_port_t *port_events;
     jack_ringbuffer_t *ringbuffer;
+    jack_ringbuffer_t *midi_ringbuffer;
+    uint64_t nframes;
     int overrun;
 } jack_handle_t;
 
@@ -38,6 +42,26 @@ int pysdr_jack_process(jack_nframes_t nframes, void *arg)
             handle->overrun++;
     }
 
+    void* midi_buf = jack_port_get_buffer(handle->port_events, nframes);
+
+    jack_nframes_t events_count = jack_midi_get_event_count(midi_buf);
+    jack_midi_event_t in_event;
+    for (x = 0; x < events_count; x++) {
+        jack_midi_event_get(&in_event, midi_buf, x);
+
+        if (jack_ringbuffer_write_space(handle->midi_ringbuffer)
+            < sizeof(jack_nframes_t) + sizeof(jack_nframes_t))
+            continue;
+
+        jack_nframes_t time = handle->nframes + in_event.time;
+
+        jack_ringbuffer_write(handle->midi_ringbuffer, &time, sizeof(jack_nframes_t));
+        jack_ringbuffer_write(handle->midi_ringbuffer, &(in_event.size), sizeof(size_t));
+        jack_ringbuffer_write(handle->midi_ringbuffer, in_event.buffer, in_event.size);
+    }
+
+    handle->nframes += nframes;
+
     return 0;
 }
 
@@ -63,9 +87,14 @@ static PyObject *pysdr_jack_init(PyObject *self, PyObject *args)
     handle->port_q = jack_port_register(handle->client, "input_q", JACK_DEFAULT_AUDIO_TYPE,
                                         JackPortIsInput, 0);
 
+    handle->port_events = jack_port_register(handle->client, "input_events", JACK_DEFAULT_MIDI_TYPE,
+                                                JackPortIsInput, 0);
+
     int sample_rate = jack_get_sample_rate(handle->client);
     handle->ringbuffer = jack_ringbuffer_create(4 * sample_rate * 2 * sizeof(float));
+    handle->midi_ringbuffer = jack_ringbuffer_create(1024);
     handle->overrun = 0;
+    handle->nframes = 0;
 
     return PyCapsule_New((void *) handle, NULL, pysdr_jack_handle_destructor);
 }
@@ -123,6 +152,11 @@ static PyObject *pysdr_jack_gather_samples(PyObject *self, PyObject *args)
     
     float *samples = (float *) PyDataMem_NEW(sizeof(float) * 2 * frames_no);
 
+    if (!samples) {
+        PyErr_NoMemory();
+        return NULL;
+    }
+
     int read = 0;
     while (read < frames_no)
         read += jack_ringbuffer_read(handle->ringbuffer, (char *) &(samples[2 * read]),
@@ -134,6 +168,40 @@ static PyObject *pysdr_jack_gather_samples(PyObject *self, PyObject *args)
     ((PyArrayObject *) array)->flags |= NPY_OWNDATA; 
 
     return array;
+}
+
+static PyObject *pysdr_jack_gather_midi_event(PyObject *self, PyObject *args)
+{
+    PyObject *handle_obj;
+
+    if (!PyArg_ParseTuple(args, "O", &handle_obj))
+        return NULL;
+
+    jack_handle_t *handle;
+    if ((handle = PyCapsule_GetPointer(handle_obj, NULL)) == 0)
+        return NULL;
+
+    if (jack_ringbuffer_read_space(handle->midi_ringbuffer)
+        < sizeof(jack_nframes_t) + sizeof(size_t)) {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    jack_nframes_t time;
+    jack_ringbuffer_read(handle->midi_ringbuffer, &time, sizeof(jack_nframes_t));
+    size_t size;
+    jack_ringbuffer_read(handle->midi_ringbuffer, &size, sizeof(size_t));
+
+    PyObject *string;
+
+    if ((string = PyString_FromStringAndSize(NULL, size)) == 0) {
+        jack_ringbuffer_read_advance(handle->midi_ringbuffer, size);
+        return NULL;
+    }
+
+    jack_ringbuffer_read(handle->midi_ringbuffer, PyString_AsString(string), size);
+
+    return Py_BuildValue("(IN)", time, string);
 }
 
 float interpolate(float val, float x0, float x1, float y0, float y1)
@@ -218,6 +286,7 @@ static PyMethodDef pysdrextMethods[] = {
         {"jack_get_sample_rate", pysdr_jack_get_sample_rate, METH_VARARGS, NULL},
         {"jack_activate", pysdr_jack_activate, METH_VARARGS, NULL},
         {"jack_gather_samples", pysdr_jack_gather_samples, METH_VARARGS, NULL},
+        {"jack_gather_midi_event", pysdr_jack_gather_midi_event, METH_VARARGS, NULL},
         {NULL, NULL, 0, NULL}
 };
 

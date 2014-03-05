@@ -87,8 +87,8 @@ class DetectorScript():
         self.plots = dict()
         self.plot_x_offset = 100
 
-        self.__dict__['freq2bin'] = lambda x: int(x * viewer.bins / viewer.sig_input.sample_rate + viewer.bins / 2)
-        self.__dict__['bin2freq'] = lambda x: float(x - viewer.bins / 2) / viewer.bins * viewer.sig_input.sample_rate
+        self.__dict__['freq2bin'] = viewer.freq_to_bin
+        self.__dict__['bin2freq'] = viewer.bin_to_freq
         self.__dict__['row_duration'] = float(viewer.bins - viewer.overlap) / viewer.sig_input.sample_rate
 
         self.__dict__['final'] = event_marker.final
@@ -97,8 +97,7 @@ class DetectorScript():
 
         self.__dict__['plot'] = self.plot
         self.__dict__['plot_bin'] = self.plot_bin
-        self.__dict__['plot_freq'] = lambda name, x: self.plot_bin(name, \
-                                                                    self.__dict__['freq2bin'](x))
+        self.__dict__['plot_freq'] = lambda name, x: self.plot_bin(name, viewer.freq_to_bin(x))
 
         self.__dict__['noise'] = self.noise
         self.__dict__['peak'] = self.peak
@@ -158,3 +157,24 @@ class EventMarker():
     def on_texture_insert(self):
         self.marks = [(a, b, c) for (a, b, c) in self.marks \
                         if a[1] > self.viewer.texture_row - self.viewer.multitexture.get_height()]
+
+class MIDIEventHandler:
+    def __init__(self, viewer, marker):
+        self.viewer = viewer
+        self.marker = marker
+
+    def on_log_spectrum(self, spectrum):
+        for frame, message in self.viewer.sig_input.get_midi_events():
+            if len(message) > 3 and message[0:2] == "\xf0\x7d" and message[-1] == "\xf7":
+                try:
+                    freq_a, freq_b, rel_frame_a, rel_frame_b, desc = message[2:-1].split(',', 4)
+
+                    row_range = tuple([(frame + int(x)) / (self.viewer.bins - self.viewer.overlap)
+                                        for x in (rel_frame_a, rel_frame_b)])
+                    bin_range = tuple([self.viewer.freq_to_bin(float(x)) for x in (freq_a, freq_b)])
+
+                    self.marker.marks.append((row_range, bin_range, desc))
+                except ValueError as e:
+                    print "failed to parse MIDI message '%s': %s" % (message[2:-1], e)
+            else:
+                print "unknown MIDI message at frame %d: %s" % (frame, message.encode("hex"))
