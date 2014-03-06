@@ -29,7 +29,8 @@ def screenshot(viewer):
         image = np.zeros((resolution[1], resolution[0], 3), dtype=np.uint8)
         glReadPixels(0, 0, resolution[0], resolution[1], GL_RGB, GL_UNSIGNED_BYTE, image)
 
-        Image.fromarray(image[::-1,:,:]).save(time.strftime("screenshot_%Y%m%d%H%M%S.bmp", time.gmtime()))
+        Image.fromarray(image[::-1,:,:].copy()).save(time.strftime("screenshot_%Y%m%d%H%M%S.bmp",
+                                                                    time.gmtime()))
     except Exception as e:
         print e
 
@@ -75,14 +76,16 @@ def textureshot(viewer):
                 viewer.call_layers('draw_content')
                 glPopMatrix()
 
-                glReadPixels(0, 0, unit_resolution[0], unit_resolution[1], GL_RGB, GL_UNSIGNED_BYTE, unit_image)
+                glReadPixels(0, 0, unit_resolution[0], unit_resolution[1], GL_RGB,
+                                GL_UNSIGNED_BYTE, unit_image)
                 image[unit_resolution[1] * y:unit_resolution[1] * (y + 1),
                         unit_resolution[0] * x:unit_resolution[0] * (x + 1)] = unit_image
 
         glDeleteFramebuffers(1, [fbo])
         glDeleteRenderbuffers(1, [rbo])
 
-        Image.fromarray(image[::-1,:,:]).save(time.strftime("textureshot_%Y%m%d%H%M%S.bmp", time.gmtime()))
+        Image.fromarray(image[::-1,:,:].copy()).save(time.strftime("textureshot_%Y%m%d%H%M%S.bmp",
+                                                                    time.gmtime()))
 
     except Exception as e:
         print e
