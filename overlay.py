@@ -48,38 +48,47 @@ class View:
 
     def setup(self):
         glTranslated(self.origin_x, self.origin_y, 0)
-        glScalef(self.scale_x, self.scale_y, 1.0)
+        glScaled(self.scale_x, self.scale_y, 1.0)
 
-class PlotOverlay:
-    def __init__(self, viewer, sig_input):
+UNIT_HZ = ((1e6, "MHz"), (1e3, "kHz"), (1e0, "Hz"))
+UNIT_SEC = ((60, "min"), (1, "sec"))
+UNIT_ONE = ((1.0, ""),)
+
+def _unit_format(unit, base):
+    if unit is None:
+        return lambda x: ""
+
+    for unit_base, postfix in unit:
+        if unit_base < base * 10 or unit_base == 1:
+            fmt_str = "%%.%df %s" % (max(0, math.ceil(math.log10(unit_base / base))), postfix)
+            return lambda x: fmt_str % (x / unit_base,)
+
+def _axis(a, b, scale, offset, unit, cutoff):
+    visible_area = abs((b - a) * scale)
+
+    base = math.log(visible_area, 10)
+    for x in [math.log10(5), math.log10(2), 0]:
+        if math.floor(base) - x >= base - (1 + 1e-5):
+            base = math.floor(base) - x
+            break
+
+    base = 10 ** base * (scale / abs(scale))
+
+    ticks = [((m * base - offset) / scale, m * base) for m
+             in range(int(math.floor((a * scale + offset) / base)),
+                      int(math.ceil((b * scale + offset) / base) + 1))]
+    ticks = [m for m in ticks if m[0] >= cutoff[0] + -1e-5 and m[0] <= cutoff[1] + 1e-5]
+
+    fmt = _unit_format(unit, abs(base))
+    return [(m[0], fmt(m[1] + 0.0)) for m in ticks]
+
+def static_axis(unit, scale, cutoff=(0.0, 1.0), offset=0.0):
+    return lambda a, b: _axis(a, b, scale, offset, unit, cutoff)
+
+class PlotAxes:
+    def __init__(self, viewer, axis_x, axis_y):
         self.viewer = viewer
-        self.sig_input = sig_input
-
-    @staticmethod
-    def get_base(a, b):
-        p = math.log(b - a, 0.1)
-        c = math.ceil(p)
-
-        if c + math.log(0.2, 0.1) < p + 1:
-            c += math.log(0.2, 0.1)
-
-        if c + math.log(0.5, 0.1) < p + 1:
-            c += math.log(0.5, 0.1)
-
-        return math.pow(0.1, c)
-
-    @staticmethod
-    def get_marks(a, b, s):
-        return [m * s for m in range(int(math.ceil(a / s)) - 1,
-                                    int(math.ceil(b / s)) + 2)]
-
-    @staticmethod
-    def format_freq(x, base):
-        l = int(math.ceil(math.log(base, 0.1)))
-
-        for b in [(-6, "MHz"), (-3, "kHz"), (0, "Hz")]:
-            if l <= b[0] + 1 or b[0] == 0:
-                return ("%%.%df %%s" % max(0, l - b[0])) % (x * math.pow(10, b[0]), b[1])
+        self.tickers = (axis_x, axis_y)
 
     def draw_text_ss(self, x, y, text):
         glWindowPos2i(int(x), int(y))
@@ -98,45 +107,25 @@ class PlotOverlay:
     def draw_content(self):
         view = self.viewer.view
 
-        x_a = -view.origin_x / view.scale_x
-        x_b = x_a + self.viewer.screen_size[0] / view.scale_x
+        a, b = view.from_screen(0, 0), view.from_screen(*self.viewer.screen_size)
 
-        y_a = -view.origin_y / view.scale_y
-        y_b = y_a + self.viewer.screen_size[1] / view.scale_y
+        for axis, ticker, m in zip((0, 1), self.tickers,
+                                   (lambda a, b: (a, b), lambda a, b: (b, a))):
+            if ticker == None:
+                continue
 
-        bw = self.sig_input.sample_rate / 2
+            (aa, oa), (ab, ob) = m(*a), m(*b)
+            ticks = ticker(aa, ab)
 
-        base = self.get_base(x_a * bw, x_b * bw)
-        marks = [l for l in self.get_marks(x_a * bw, x_b * bw, base) if (l/bw >= -1.0001 and l/bw <= 1.0001)]
+            glColor4f(1.0, 1.0, 1.0, 0.25)
+            glBegin(GL_LINES)
+            for pos, label in ticks:
+                    glVertex2f(*m(pos, oa))
+                    glVertex2f(*m(pos, ob))
+            glEnd()
 
-        glColor4f(1.0, 1.0, 1.0, 0.25)
-        glBegin(GL_LINES)
+            glColor4f(1.0, 1.0, 1.0, 1.0)
+            for pos, label in ticks:
+                x, y = m(view.to_screen(pos, pos)[axis] + 5, 5)
+                self.draw_text_ss(x, y, label)
 
-        for x in marks:
-            glVertex2f(x / bw, y_a)
-            glVertex2f(x / bw, y_b)
-
-        glEnd()
-
-        glColor4f(1.0, 1.0, 1.0, 1.0)
-
-        glPushMatrix()
-        glLoadIdentity()
-
-        for x in marks:
-            self.draw_text_ss(((x/bw - x_a) / (x_b - x_a)) * self.viewer.screen_size[0] + 5, 5,
-                                self.format_freq(x, base))
-
-        glPopMatrix()
-
-        base = self.get_base(y_a, y_b)
-        marks = [l for l in self.get_marks(y_a, y_b, base) if l >= 0 and l <= 1]
-
-        glColor4f(1.0, 1.0, 1.0, 0.25)
-        glBegin(GL_LINES)
-
-        for y in marks:
-            glVertex2f(x_a, y)
-            glVertex2f(x_b, y)
-
-        glEnd()

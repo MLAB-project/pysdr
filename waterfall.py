@@ -11,10 +11,10 @@ from OpenGL.GL import *
 from OpenGL.GLUT import *
 from OpenGL.GLU import *
 
-from graph import *
-from input import *
-from overlay import *
-from console import *
+from graph import MultiTexture, PlotLine
+from input import RawSigInput, JackInput
+from overlay import View, PlotAxes, static_axis, UNIT_HZ, UNIT_SEC, _axis
+from console import Console
 from commands import make_commands_layer
 from events import EventMarker, DetectorScript, MIDIEventHandler
 
@@ -73,7 +73,8 @@ class Viewer:
             except ValueError:
                 pass
 
-        self.call_layers_handler('on_mouse_button', (button, state, x, self.screen_size[1] - y))
+        self.call_layers_handler('on_mouse_button', (button, state, x,
+                                                     self.screen_size[1] - y))
 
         glutPostRedisplay()
 
@@ -142,14 +143,16 @@ class Texture():
 
 class RangeSelector():
     def __init__(self, viewer):
-        self.texture = Texture(ext.mag2col((np.arange(64, dtype=np.float32) / 64) * 3.75 - 1.75).reshape((64, 1)))
+        self.texture = Texture(ext.mag2col((np.arange(64, dtype=np.float32) / 64)
+                                           * 3.75 - 1.75).reshape((64, 1)))
         self.viewer = viewer
         self.histogram = PlotLine(90)
         self.hist_range = (-60, 20)
         self.dragging = None
 
     def mag_to_pixel(self, mag):
-        return int((float(mag) - self.hist_range[0]) / (self.hist_range[1] - self.hist_range[0]) * 180)
+        return int((float(mag) - self.hist_range[0])
+                   / (self.hist_range[1] - self.hist_range[0]) * 180)
 
     def pixel_to_mag(self, pixel):
         return float(pixel) / 180 * (self.hist_range[1] - self.hist_range[0]) + self.hist_range[0]
@@ -209,8 +212,7 @@ class RangeSelector():
 
         if state == GLUT_DOWN:
             w, h = self.viewer.screen_size
-            mag_a, mag_b = self.viewer.mag_range
-            pix_a, pix_b = [self.mag_to_pixel(l) for l in (mag_a, mag_b)]
+            pix_a, pix_b = [self.mag_to_pixel(l) for l in self.viewer.mag_range]
 
             if w - 100 <= x <= w - 20:
                 if y + 10 >= h - 200 + pix_a >= y:
@@ -256,10 +258,17 @@ class WaterfallWindow(Viewer):
         self.bins = bins
         self.window = 0.5 * (1.0 - np.cos((2 * math.pi * np.arange(self.bins)) / self.bins))
         self.overlap = overlap
-
+        self.row_duration = float(bins - overlap) / sig_input.sample_rate
         self.multitexture = MultiTexture(1024, 1024, self.bins / 1024, 1)
 
-        self.overlay = PlotOverlay(self, self.sig_input)
+        def time_axis(a, b):
+            scale = self.row_duration * self.multitexture.get_height()
+            return _axis(a, b, scale, self.row_duration * self.texture_row - scale,
+                         UNIT_SEC, (0.0, 1.0))
+
+        self.overlay = PlotAxes(self, static_axis(UNIT_HZ, sig_input.sample_rate / 2,
+                                                  cutoff=(-1.0, 1.0)), time_axis)
+
         event_marker = EventMarker(self)
         detector_script = DetectorScript(self, event_marker, "detector.py")
         self.layers = self.layers + [event_marker, detector_script,
@@ -267,7 +276,7 @@ class WaterfallWindow(Viewer):
                                         make_commands_layer(self),
                                         Console(self, globals())] \
                                     + [MIDIEventHandler(self, event_marker)] \
-                                    if sig_input.__class__ == JackInput else []
+                                    if isinstance(sig_input, JackInput) else []
 
         self.texture_inserts = Queue.Queue()
         self.texture_edge = 0
