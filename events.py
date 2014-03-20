@@ -166,6 +166,7 @@ class MIDIEventHandler:
     def on_log_spectrum(self, spectrum):
         for frame, message in self.viewer.sig_input.get_midi_events():
             if len(message) > 3 and message[0:2] == "\xf0\x7d" and message[-1] == "\xf7":
+                print  "RECEIVED MIDI message:" + message[2:-1]
                 try:
                     freq_a, freq_b, rel_frame_a, rel_frame_b, desc = message[2:-1].split(',', 4)
 
