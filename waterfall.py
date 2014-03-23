@@ -16,7 +16,7 @@ from input import RawSigInput, JackInput
 from overlay import View, PlotAxes, static_axis, UNIT_HZ, UNIT_SEC, _axis
 from console import Console
 from commands import make_commands_layer
-from events import EventMarker, DetectorScript, MIDIEventHandler
+from events import EventMarker, DetectorScript, MIDIEventGatherer
 
 import ext
 
@@ -99,6 +99,7 @@ class Viewer:
 
     def cb_keyboard(self, key, x, y):
         self.call_layers_handler('on_key_press', (key))
+        glutPostRedisplay()
 
     def get_layer(self, type):
         a = [a for a in self.layers if a.__class__ == type]
@@ -270,13 +271,7 @@ class WaterfallWindow(Viewer):
                                                   cutoff=(-1.0, 1.0)), time_axis)
 
         event_marker = EventMarker(self)
-        detector_script = DetectorScript(self, event_marker, "detector.py")
-        self.layers = self.layers + [event_marker, detector_script,
-                                     self.overlay, RangeSelector(self),
-                                     make_commands_layer(self),
-                                     Console(self, globals())] \
-                      + ([MIDIEventHandler(self, event_marker)]
-                         if isinstance(sig_input, JackInput) else [])
+        self.layers.append(self.overlay)
 
         self.texture_inserts = Queue.Queue()
         self.texture_edge = 0
@@ -366,6 +361,8 @@ if __name__ == "__main__":
     parser.add_argument('-o', '--overlap', type=float, default=0.75,
                         help='overlap between consecutive windows as a proportion \
                                 of the number of bins (default: %(default)s)')
+    parser.add_argument('-d', '--detector', metavar='FILENAME', action='append', \
+                        help='attach the given detector script')
 
     args = parser.parse_args()
 
@@ -384,6 +381,18 @@ if __name__ == "__main__":
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA)
 
     viewer = WaterfallWindow(sig_input, args.bins, overlap=overlap_bins)
+
+    if args.detector:
+        detector_em = EventMarker(viewer)
+        viewer.layers.append(detector_em)
+        viewer.layers += [DetectorScript(viewer, [detector_em], fn) for fn in args.detector]
+
+    if isinstance(sig_input, JackInput):
+        midi_em = EventMarker(viewer)
+        viewer.layers += [midi_em, MIDIEventGatherer(viewer, [midi_em])]
+
+    viewer.layers += [make_commands_layer(viewer), RangeSelector(viewer), Console(viewer, globals())]
+
     viewer.start()
 
     glutMainLoop()

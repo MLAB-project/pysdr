@@ -8,7 +8,7 @@ class PlotLine:
         self.points = points
         self.array = np.zeros((self.points, 2), 'f')
         self.data = self.array[:,1]
-        self.array[:,0] = np.arange(self.points, dtype=np.float) / (self.points - 1)
+        self.array[:,0] = np.arange(self.points, dtype=np.float) / self.points
 
     def draw(self):
         glEnableClientState(GL_VERTEX_ARRAY)
@@ -16,19 +16,35 @@ class PlotLine:
         glDrawArrays(GL_LINE_STRIP, 0, self.points)
         glDisableClientState(GL_VERTEX_ARRAY)
 
-    def draw_scroll(self, edge):
+    def draw_section(self, start, end):
         glEnableClientState(GL_VERTEX_ARRAY)
-
         glVertexPointer(2, GL_FLOAT, 0, self.array)
 
         glPushMatrix()
-        glTranslatef(1.0 - float(edge) / self.points, 0, 0)
-        glDrawArrays(GL_LINE_STRIP, 0, edge)
-        glPopMatrix()
 
-        glPushMatrix()
-        glTranslatef(-float(edge) / self.points, 0, 0)
-        glDrawArrays(GL_LINE_STRIP, edge, self.points - edge)
+        pos = start
+        while pos < end:
+            offset = pos % self.points
+
+            if offset == self.points - 1:
+                glBegin(GL_LINES)
+                glVertex2f(0.0, self.data[-1])
+                glVertex2f(1.0 / self.points, self.data[0])
+                glEnd()
+                glTranslatef(1.0 / self.points, 0, 0)
+                pos += 1
+                continue
+
+            advance = min(self.points - offset - 1, end - pos)
+
+            glPushMatrix()
+            glTranslatef(-float(offset) / self.points, 0, 0)
+            glDrawArrays(GL_LINE_STRIP, offset, advance + 1)
+            glPopMatrix()
+
+            glTranslatef(float(advance) / self.points, 0, 0)
+            pos += advance
+
         glPopMatrix()
 
         glDisableClientState(GL_VERTEX_ARRAY)

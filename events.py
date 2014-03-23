@@ -1,10 +1,55 @@
+import traceback
+import sys
+
 from OpenGL.GL import *
 
 from graph import *
 
+class EventMarker:
+    def __init__(self, viewer, mark_color=None):
+        self.viewer = viewer
+        self.mark_color = mark_color or (0.0, 1.0, 0.0, 1.0)
+        self.marks = []
+
+    def on_event(self, event_id, payload):
+        if event_id.startswith('mlab.aabb_event.'):
+            event_mark = (event_id, (payload[0], payload[1]), (payload[2], payload[3]), payload[4])
+
+            for i in xrange(len(self.marks)):
+                mark = self.marks[i]
+                if (mark[0] == event_mark[0] and mark[1][0] == event_mark[1][0]
+                        and event_mark[2] == event_mark[2]):
+                    self.marks[i] = event_mark
+                    return
+            self.marks.append(event_mark)
+
+    def draw_content(self):
+        for (event_id, row_range, freq_range, desc) in self.marks:
+            xa, xb = [self.viewer.bin_to_x(x) for x in freq_range]
+            ya, yb = [self.viewer.row_to_y(x) for x in row_range]
+
+            glLineWidth(2)
+            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
+            glColor4f(*self.mark_color)
+            glBegin(GL_QUADS)
+            glVertex2f(xa, ya)
+            glVertex2f(xa, yb)
+            glVertex2f(xb, yb)
+            glVertex2f(xb, ya)
+            glEnd()
+            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
+            glLineWidth(1)
+
+            glColor4f(1.0, 1.0, 1.0, 1.0)
+            self.viewer.overlay.draw_text(xb, ya, desc)
+
+    def on_texture_insert(self):
+        self.marks = [(a, b, c, d) for (a, b, c, d) in self.marks \
+                      if b[1] > self.viewer.texture_row - self.viewer.multitexture.get_height()]
+
 class TemporalPlot(PlotLine):
     def __init__(self, viewer, x_offset, title=None):
-        PlotLine.__init__(self, viewer.multitexture.get_height())
+        PlotLine.__init__(self, 2 * viewer.multitexture.get_height())
         self.viewer = viewer
         self.x_offset = x_offset
         self.title = title
@@ -26,7 +71,10 @@ class TemporalPlot(PlotLine):
         glEnd()
         glColor4f(1.0, 1.0, 1.0, 1.0)
         glRotatef(90, 0, 0, 1)
-        PlotLine.draw_scroll(self, self.viewer.texture_edge)
+        glScalef(2, 1, 1)
+        glTranslatef(0.5 / self.points, 0.0, 0.0)
+        PlotLine.draw_section(self, self.viewer.texture_row - self.viewer.multitexture.get_height(),
+                              self.viewer.texture_row - 1)
         glPopMatrix()
 
         if self.title:
@@ -47,27 +95,29 @@ class TemporalFreqPlot(TemporalPlot):
         glColor4f(1.0, 1.0, 1.0, 1.0)
 
         glPushMatrix()
-        glScalef(-1, 1, 1)
+        glScalef(-1, 2, 1)
         glRotatef(90, 0, 0, 1)
-        PlotLine.draw_scroll(self, self.viewer.texture_edge)
+        glTranslatef(0.5 / self.points, 0.0, 0.0)
+        PlotLine.draw_section(self, self.viewer.texture_row - self.viewer.multitexture.get_height(),
+                              self.viewer.texture_row - 1)
         glPopMatrix()
 
-class DetectorScript():
-    @staticmethod
-    def peak(a, b, s):
-        return (np.max(s[a:b]), np.argmax(s[a:b]) + a)
+SCRIPT_API_METHODS = dict()
 
-    @staticmethod
-    def noise(a):
-        return np.sort(a)[len(a)/4] * 2
+class DetectorScript:
+    def script_api(func):
+        SCRIPT_API_METHODS[func.func_name] = func
 
-    def cut(self, row):
-        if self.event_marker.wip_mark == None:
-            return
+    @script_api
+    def peak(self, a, b, s):
+        bin = np.argmax(s[a:b])
+        return (s[bin], bin + a)
 
-        (row_range, a, b) = self.event_marker.wip_mark
-        self.event_marker.wip_mark = ((row_range[0], row), a, b)
+    @script_api
+    def noise(self, a):
+        return np.sort(a)[len(a) / 4] * 2
 
+    @script_api
     def plot(self, name, value):
         if not name in self.plots:
             self.plots[name] = TemporalPlot(self.viewer, self.plot_x_offset, name)
@@ -75,34 +125,40 @@ class DetectorScript():
 
         self.plots[name].set(self.viewer.process_row, value)
 
+    @script_api
     def plot_bin(self, name, value):
         if not name in self.plots:
             self.plots[name] = TemporalFreqPlot(self.viewer, name)
 
         self.plots[name].set(self.viewer.process_row, (float(value) / self.viewer.bins) * 2 - 1)
 
-    def __init__(self, viewer, event_marker, file):
+    @script_api
+    def plot_freq(self, name, value):
+        self.namespace['plot_bin'](name, self.viewer.freq_to_bin(value))
+
+    @script_api
+    def emit_event(self, event_id, payload):
+        [l.on_event(event_id, payload) for l in self.listeners]
+
+    def __init__(self, viewer, listeners, filename):
         self.viewer = viewer
-        self.event_marker = event_marker
+        self.filename = filename
         self.plots = dict()
         self.plot_x_offset = 100
+        self.disabled = False
 
-        self.__dict__['freq2bin'] = viewer.freq_to_bin
-        self.__dict__['bin2freq'] = viewer.bin_to_freq
-        self.__dict__['row_duration'] = float(viewer.bins - viewer.overlap) / viewer.sig_input.sample_rate
+        self.listeners = listeners
 
-        self.__dict__['final'] = event_marker.final
-        self.__dict__['event'] = event_marker.mark
-        self.__dict__['cut'] = self.cut
+        self.namespace = {
+            'freq2bin': self.viewer.freq_to_bin,
+            'bin2freq': self.viewer.bin_to_freq,
+            'row_duration': self.viewer.row_duration
+        }
 
-        self.__dict__['plot'] = self.plot
-        self.__dict__['plot_bin'] = self.plot_bin
-        self.__dict__['plot_freq'] = lambda name, x: self.plot_bin(name, viewer.freq_to_bin(x))
+        for name, func in SCRIPT_API_METHODS.items():
+            self.namespace[name] = func.__get__(self, DetectorScript)
 
-        self.__dict__['noise'] = self.noise
-        self.__dict__['peak'] = self.peak
-
-        execfile(file, self.__dict__)
+        execfile(filename, self.namespace)
 
     def draw_screen(self):
         for plot in self.plots.values():
@@ -115,67 +171,39 @@ class DetectorScript():
                 plot.draw_content()
 
     def on_lin_spectrum(self, spectrum):
-        self.run(self.viewer.process_row, spectrum)
-
-class EventMarker():
-    def __init__(self, viewer):
-        self.viewer = viewer
-        self.marks = []
-        self.wip_mark = None
-
-    def mark(self, row_range, freq_range, description):
-        self.wip_mark = (row_range, freq_range, description)
-
-    def final(self):
-        if self.wip_mark == None:
+        if self.disabled:
             return
 
-        self.marks.append(self.wip_mark)
-        self.wip_mark = None
+        try:
+            self.namespace['run'](self.viewer.process_row, spectrum)
+        except Exception:
+            print "exception in %s, disabling:" % self.filename
+            traceback.print_exc(file=sys.stdout)
+            self.disabled = True
 
-    def draw_content(self):
-        for (row_range, freq_range, description) in self.marks \
-                                                    + ([self.wip_mark] if self.wip_mark else []):
-            xa, xb = [self.viewer.bin_to_x(x) for x in freq_range]
-            ya, yb = [self.viewer.row_to_y(x) for x in row_range]
-            
-            glLineWidth(2)
-            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
-            glColor4f(0.0, 1.0, 0.0, 1.0)
-            glBegin(GL_QUADS)
-            glVertex2f(xa, ya)
-            glVertex2f(xa, yb)
-            glVertex2f(xb, yb)
-            glVertex2f(xb, ya)
-            glEnd()
-            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
-            glLineWidth(1)
-
-            glColor4f(1.0, 1.0, 1.0, 1.0)
-            self.viewer.overlay.draw_text(xb, ya, description)
-
-    def on_texture_insert(self):
-        self.marks = [(a, b, c) for (a, b, c) in self.marks \
-                        if a[1] > self.viewer.texture_row - self.viewer.multitexture.get_height()]
-
-class MIDIEventHandler:
-    def __init__(self, viewer, marker):
+class MIDIEventGatherer:
+    def __init__(self, viewer, listeners):
         self.viewer = viewer
-        self.marker = marker
+        self.listeners = listeners
 
     def on_log_spectrum(self, spectrum):
         for frame, message in self.viewer.sig_input.get_midi_events():
             if len(message) > 3 and message[0:2] == "\xf0\x7d" and message[-1] == "\xf7":
-                print  "RECEIVED MIDI message:" + message[2:-1]
                 try:
-                    freq_a, freq_b, rel_frame_a, rel_frame_b, desc = message[2:-1].split(',', 4)
+                    event_id, payload = message[2:-1].split(':', 1)
+                    payload = tuple(payload.split(','))
 
-                    row_range = tuple([(frame + int(x)) / (self.viewer.bins - self.viewer.overlap)
-                                        for x in (rel_frame_a, rel_frame_b)])
-                    bin_range = tuple([self.viewer.freq_to_bin(float(x)) for x in (freq_a, freq_b)])
+                    if event_id.startswith('mlab.aabb_event.'):
+                        rel_frame_a, rel_frame_b, freq_a, freq_b, desc = payload
 
-                    self.marker.marks.append((row_range, bin_range, desc))
-                except ValueError as e:
+                        row_range = tuple([(frame + int(x)) / (self.viewer.bins - self.viewer.overlap)
+                                           for x in (rel_frame_a, rel_frame_b)])
+                        bin_range = tuple([self.viewer.freq_to_bin(float(x)) for x in (freq_a, freq_b)])
+
+                        payload = row_range + bin_range + (desc,)
+
+                    [l.on_event(event_id, payload) for l in self.listeners]
+                except (ValueError, TypeError) as e:
                     print "failed to parse MIDI message '%s': %s" % (message[2:-1], e)
             else:
                 print "unknown MIDI message at frame %d: %s" % (frame, message.encode("hex"))
