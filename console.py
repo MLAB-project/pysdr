@@ -37,6 +37,8 @@ class Console(InteractiveConsole):
         self.active = False
         InteractiveConsole.__init__(self, locals=locals)
 
+        self.on_resize(*getattr(viewer, 'screen_size', (1024, 1024)))
+
         self.prev_stdout = sys.stdout
         sys.stdout = self
 

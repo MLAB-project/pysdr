@@ -272,11 +272,11 @@ class WaterfallWindow(Viewer):
         event_marker = EventMarker(self)
         detector_script = DetectorScript(self, event_marker, "detector.py")
         self.layers = self.layers + [event_marker, detector_script,
-                                        self.overlay, RangeSelector(self),
-                                        make_commands_layer(self),
-                                        Console(self, globals())] \
-                                    + [MIDIEventHandler(self, event_marker)] \
-                                    if isinstance(sig_input, JackInput) else []
+                                     self.overlay, RangeSelector(self),
+                                     make_commands_layer(self),
+                                     Console(self, globals())] \
+                      + ([MIDIEventHandler(self, event_marker)]
+                         if isinstance(sig_input, JackInput) else [])
 
         self.texture_inserts = Queue.Queue()
         self.texture_edge = 0

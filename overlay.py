@@ -11,6 +11,7 @@ class View:
         self.scale_y = 480.0
         self.origin_x = 0.0
         self.origin_y = 0.0
+        self.screen_offset = (0, 0)
 
     def on_mouse_button(self, button, state, x, y):
         if state != GLUT_DOWN:
@@ -91,6 +92,7 @@ class PlotAxes:
         self.tickers = (axis_x, axis_y)
 
     def draw_text_ss(self, x, y, text):
+        x, y = self.viewer.view.screen_offset[0] + x, self.viewer.view.screen_offset[1] + y
         glWindowPos2i(int(x), int(y))
         for c in text:
             glutBitmapCharacter(GLUT_BITMAP_8_BY_13, ord(c))
@@ -128,4 +130,3 @@ class PlotAxes:
             for pos, label in ticks:
                 x, y = m(view.to_screen(pos, pos)[axis] + 5, 5)
                 self.draw_text_ss(x, y, label)
-
