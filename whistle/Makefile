@@ -1,15 +1,14 @@
 ifneq ($(V),1)
-        Q := @
+		Q := @
 endif
 
-INCDIR  	= -I include/
-CCFLAGS		= -g -O2 -Wall -W $(INCDIR)
+INCDIR		= -I include/
+CCFLAGS		= -g -O2 $(INCDIR)
 CXXFLAGS	= $(CCFLAGS)
-LDFLAGS		=
-LIBS		= -ljack
+LDFLAGS		= -export-dynamic
+LIBS		= -ljack -ldl -lm
 CC			= gcc $(CCFLAGS)
-CXX			= g++ $(CXXFLAGS)
-LD			= g++ $(LDFLAGS)
+LD			= gcc $(LDFLAGS)
 
 BIN			= whistle
 OBJS		= whistle.o
