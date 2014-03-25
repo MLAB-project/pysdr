@@ -37,11 +37,13 @@ def _read_fmt_chunk(fid):
         fmt = '<'
     res = struct.unpack(fmt+'iHHIIHH',fid.read(20))
     size, comp, noc, rate, sbytes, ba, bits = res
-    if comp not in KNOWN_WAVE_FORMATS or size > 16:
+
+    if comp not in KNOWN_WAVE_FORMATS or (size > 16 and comp != WAVE_FORMAT_IEEE_FLOAT):
         comp = WAVE_FORMAT_PCM
         warnings.warn("Unknown wave file format", WavFileWarning)
-        if size > 16:
-            fid.read(size - 16)
+
+    if size > 16:
+        fid.read(size - 16)
 
     return size, comp, noc, rate, sbytes, ba, bits
 

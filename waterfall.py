@@ -269,8 +269,6 @@ class WaterfallWindow(Viewer):
 
         self.overlay = PlotAxes(self, static_axis(UNIT_HZ, sig_input.sample_rate / 2,
                                                   cutoff=(-1.0, 1.0)), time_axis)
-
-        event_marker = EventMarker(self)
         self.layers.append(self.overlay)
 
         self.texture_inserts = Queue.Queue()

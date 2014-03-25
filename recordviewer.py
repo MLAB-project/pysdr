@@ -85,9 +85,8 @@ class RecordViewer(Viewer):
         def texture_work(self, bins):
             waterfall = waterfallize(self.signal, bins)
             waterfall[np.isneginf(waterfall)] = np.nan
-            waterfall = (((waterfall - np.nanmin(waterfall))
-                         / (np.nanmax(waterfall) - np.nanmin(waterfall)))
-                         * 5.5 - 4.5)
+            wmin, wmax = np.nanmin(waterfall), np.nanmax(waterfall)
+            waterfall = ((waterfall - wmin) / (wmax - wmin)) * 5.5 - 4.5
             self.new_data = ext.mag2col(waterfall.astype('f'))
             self.new_data_event.set()
 
