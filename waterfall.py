@@ -323,11 +323,19 @@ class WaterfallWindow(Viewer):
             return
 
     def process(self):
-        signal = np.zeros(self.bins, dtype=np.complex64)
+        ringbuf = np.zeros(self.bins * 4, dtype=np.complex64)
+        ringbuf_edge = self.bins
+        readsize = self.bins - self.overlap
 
         while True:
-            signal[0:self.overlap] = signal[self.bins - self.overlap:self.bins]
-            signal[self.overlap:self.bins] = self.sig_input.read(self.bins - self.overlap)
+            if (ringbuf_edge + readsize > len(ringbuf)):
+                ringbuf[0:self.overlap] = ringbuf[ringbuf_edge - self.overlap:ringbuf_edge]
+                ringbuf_edge = self.overlap
+
+            ringbuf[ringbuf_edge:ringbuf_edge + readsize] = self.sig_input.read(readsize)
+            ringbuf_edge += readsize
+
+            signal = ringbuf[ringbuf_edge - self.bins:ringbuf_edge]
 
             spectrum = np.absolute(np.fft.fft(np.multiply(signal, self.window)))
             spectrum = np.concatenate((spectrum[self.bins/2:self.bins], spectrum[0:self.bins/2]))
