@@ -246,7 +246,7 @@ class RangeSelector():
             return False
 
 class WaterfallWindow(Viewer):
-    def __init__(self, sig_input, bins, overlap=0):
+    def __init__(self, sig_input, bins, overlap=0, min_height=0):
         if bins % 1024 != 0:
             raise NotImplementedError("number of bins must be a multiple of 1024")
 
@@ -260,7 +260,8 @@ class WaterfallWindow(Viewer):
         self.window = 0.5 * (1.0 - np.cos((2 * math.pi * np.arange(self.bins)) / self.bins))
         self.overlap = overlap
         self.row_duration = float(bins - overlap) / sig_input.sample_rate
-        self.multitexture = MultiTexture(1024, 1024, self.bins / 1024, 1)
+        self.multitexture = MultiTexture(1024, 1024, self.bins / 1024,
+                                         max(1, int(math.ceil(min_height / self.row_duration / 1024))))
 
         def time_axis(a, b):
             scale = self.row_duration * self.multitexture.get_height()
@@ -359,14 +360,16 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Plot live spectral waterfall of an IQ signal.')
     parser.add_argument('-b', '--bins', type=int, default=4096,
                         help='number of bins (default: %(default)s)')
+    parser.add_argument('-H', '--height', type=float, default=0,
+                        help='minimal height of the waterfall in seconds')
+    parser.add_argument('-o', '--overlap', type=float, default=0.75,
+                        help='overlap between consecutive windows as a proportion \
+                                of the number of bins (default: %(default)s)')
     parser.add_argument('-j', '--jack', metavar='NAME', default='pysdr',
                         help='feed signal from JACK under the given name')
     parser.add_argument('-r', '--raw', metavar='RATE', type=int,
                         help='feed signal from the standard input, 2 channel \
                                 interleaved floats with the given samplerate')
-    parser.add_argument('-o', '--overlap', type=float, default=0.75,
-                        help='overlap between consecutive windows as a proportion \
-                                of the number of bins (default: %(default)s)')
     parser.add_argument('-d', '--detector', metavar='FILENAME', action='append', \
                         help='attach the given detector script')
 
@@ -386,7 +389,7 @@ if __name__ == "__main__":
     glutInitWindowSize(640, 480)
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA)
 
-    viewer = WaterfallWindow(sig_input, args.bins, overlap=overlap_bins)
+    viewer = WaterfallWindow(sig_input, args.bins, overlap=overlap_bins, min_height=args.height)
 
     if args.detector:
         detector_em = EventMarker(viewer)
