@@ -11,14 +11,13 @@ from OpenGL.GL import *
 from OpenGL.GLUT import *
 from OpenGL.GLU import *
 
-from graph import MultiTexture, PlotLine
-from input import RawSigInput, JackInput
-from overlay import View, PlotAxes, static_axis, UNIT_HZ, UNIT_SEC, _axis
-from console import Console
-from commands import make_commands_layer
-from events import EventMarker, DetectorScript, MIDIEventGatherer
-
-import ext
+from pysdr.graph import MultiTexture, PlotLine
+from pysdr.input import RawSigInput, JackInput
+from pysdr.overlay import View, PlotAxes, static_axis, UNIT_HZ, UNIT_SEC, _axis
+from pysdr.console import Console
+from pysdr.commands import make_commands_layer
+from pysdr.events import EventMarker, DetectorScript, MIDIEventGatherer
+import pysdr.ext as ext
 
 class Viewer:
     def __init__(self, window_name):
@@ -355,8 +354,8 @@ class WaterfallWindow(Viewer):
             self.process_row = self.process_row + 1
             self.texture_inserts.put(line)
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Plot live spectral waterfall of an complex I/Q signal.')
+def main():
+    parser = argparse.ArgumentParser(description='Plot live spectral waterfall of a quadrature signal.')
     parser.add_argument('-b', '--bins', type=int, default=4096,
                         help='number of FFT bins (default: %(default)s)')
     parser.add_argument('-H', '--height', type=float, default=0,
@@ -365,7 +364,8 @@ if __name__ == "__main__":
                         help='overlap between consecutive windows as a proportion \
                                 of the number of bins (default: %(default)s)')
     parser.add_argument('-j', '--jack', metavar='NAME', default='pysdr',
-                        help='feed signal from JACK under the given name')
+                        help='feed signal from JACK and use the given client name \
+                                (by default, with name \'pysdr\')')
     parser.add_argument('-r', '--raw', metavar='RATE', type=int,
                         help='feed signal from the standard input, 2 channel \
                                 interleaved floats with the given samplerate')
@@ -404,3 +404,6 @@ if __name__ == "__main__":
     viewer.start()
 
     glutMainLoop()
+
+if __name__ == "__main__":
+    main()

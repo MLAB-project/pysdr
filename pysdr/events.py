@@ -3,7 +3,7 @@ import sys
 
 from OpenGL.GL import *
 
-from graph import *
+from pysdr.graph import *
 
 class EventMarker:
     def __init__(self, viewer, mark_color=None):

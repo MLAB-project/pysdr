@@ -2,7 +2,7 @@ import numpy as np
 import time
 import sys
 
-import ext
+import pysdr.ext as ext
 
 class SigInput:
     def __init__(self):

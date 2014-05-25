@@ -6,7 +6,7 @@ from OpenGL.GL import *
 from OpenGL.GL.ARB.framebuffer_object import *
 from OpenGL.GL.EXT.framebuffer_object import *
 
-from overlay import View
+from pysdr.overlay import View
 
 class KeyTriggers:
     def __init__(self, cmds):

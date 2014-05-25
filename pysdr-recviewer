@@ -13,10 +13,9 @@ import os.path
 from OpenGL.GL import *
 from OpenGL.GLUT import *
 
-from waterfall import *
-from overlay import *
-
-import ext
+from pysdr.waterfall import *
+from pysdr.overlay import *
+import pysdr.ext as ext
 
 class AsyncWorker(threading.Thread):
     def __init__(self):

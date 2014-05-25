@@ -1,14 +1,19 @@
 def configuration(parent_package='', top_path=None):
-    import numpy
     from numpy.distutils.misc_util import Configuration
 
-    config = Configuration('.',
-                           parent_package,
-                           top_path)
-    config.add_extension('ext', ['pysdrext/pysdr.c'], libraries=['jack'])
+    config = Configuration(None, parent_package, top_path)
+    config.add_subpackage('pysdr')
 
     return config
 
 if __name__ == "__main__":
     from numpy.distutils.core import setup
-    setup(configuration=configuration)
+    setup(name='PySDR',
+          author='Martin Poviser',
+          author_email='martin.povik@gmail.com',
+          license='GPL',
+          version='0.1dev',
+          url='http://www.github.com/MLAB-project/pysdr',
+          configuration=configuration,
+          requires=['numpy', 'pyopengl', 'scipy'],
+          scripts=['pysdr-recviewer', 'pysdr-waterfall'])
