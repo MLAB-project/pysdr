@@ -39,6 +39,9 @@ class RawSigInput(SigInput):
     def start(self):
         pass
 
+    def __str__(self):
+        return "raw input from '%s'" % self.file.name
+
 class JackInput(SigInput):
     def __init__(self, name):
         self.name = name
@@ -69,3 +72,6 @@ class JackInput(SigInput):
 
     def start(self):
         ext.jack_activate(self.handle)
+
+    def __str__(self):
+        return "JACK port '%s'" % self.name

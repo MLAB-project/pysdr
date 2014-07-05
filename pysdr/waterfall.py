@@ -354,6 +354,34 @@ class WaterfallWindow(Viewer):
             self.process_row = self.process_row + 1
             self.texture_inserts.put(line)
 
+class Label:
+    @staticmethod
+    def draw_bg(x, y, w, h, padding=0):
+        x, y = x - padding, y - padding
+        w, h = w + 2 * padding, h + 2 * padding
+
+        glColor4f(0.0, 0.0, 0.0, 0.5)
+        glBegin(GL_QUADS)
+        glVertex2i(x + w, y)
+        glVertex2i(x + w, y + h)
+        glVertex2i(x, y + h)
+        glVertex2i(x, y)
+        glEnd()
+
+    def __init__(self, viewer, content):
+        self.viewer = viewer
+        self.content = content
+
+    def draw_screen(self):
+        w, h = self.viewer.screen_size
+        x, y = 10, h - Console.CHAR_HEIGHT - 10
+
+        self.draw_bg(x, y - 2, Console.CHAR_WIDTH * len(self.content),
+                     Console.CHAR_HEIGHT, padding=3)
+
+        glColor4f(1.0, 1.0, 1.0, 0.75)
+        Console.draw_string(x, y, self.content)
+
 def main():
     parser = argparse.ArgumentParser(description='Plot live spectral waterfall of a quadrature signal.')
     parser.add_argument('-b', '--bins', type=int, default=4096,
@@ -399,7 +427,8 @@ def main():
         midi_em = EventMarker(viewer)
         viewer.layers += [midi_em, MIDIEventGatherer(viewer, [midi_em])]
 
-    viewer.layers += [make_commands_layer(viewer), RangeSelector(viewer), Console(viewer, globals())]
+    viewer.layers += [make_commands_layer(viewer), RangeSelector(viewer),
+                      Label(viewer, str(viewer.sig_input)), Console(viewer, globals())]
 
     viewer.start()
 
