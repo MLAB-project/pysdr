@@ -6,6 +6,7 @@ import Queue
 import threading
 import numpy as np
 import argparse
+import signal
 
 from OpenGL.GL import *
 from OpenGL.GLUT import *
@@ -383,6 +384,8 @@ class Label:
         Console.draw_string(x, y, self.content)
 
 def main():
+    signal.signal(signal.SIGINT, lambda a, b: sys.exit(0))
+
     parser = argparse.ArgumentParser(description='Plot live spectral waterfall of a quadrature signal.')
     parser.add_argument('-b', '--bins', type=int, default=4096,
                         help='number of FFT bins (default: %(default)s)')
