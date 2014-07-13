@@ -10,9 +10,9 @@ meteor_treshold = 0.7
 def run(row, spectrum):
     global ongoing_event, last_detect_row
 
-    (peak_pow, peak_bin) = peak(freq2bin(10300), freq2bin(10900), spectrum)
+    (peak_pow, peak_bin) = peak(freq2bin(10500), freq2bin(10700), spectrum)
     avg_pow = np.average(spectrum[peak_bin - avg_spread_bin:peak_bin + avg_spread_bin])
-    noise_pow = noise(spectrum[freq2bin(9000):freq2bin(9600)])
+    noise_pow = noise(spectrum[freq2bin(11000):freq2bin(11500)])
 
     sn = np.log(avg_pow / noise_pow)
     plot("sn", sn)
