@@ -53,9 +53,9 @@ int pysdr_jack_process(jack_nframes_t nframes, void *arg)
             < sizeof(jack_nframes_t) + sizeof(jack_nframes_t))
             continue;
 
-        jack_nframes_t time = handle->nframes + in_event.time;
+        uint64_t time = handle->nframes + in_event.time;
 
-        jack_ringbuffer_write(handle->midi_ringbuffer, &time, sizeof(jack_nframes_t));
+        jack_ringbuffer_write(handle->midi_ringbuffer, &time, sizeof(uint64_t));
         jack_ringbuffer_write(handle->midi_ringbuffer, &(in_event.size), sizeof(size_t));
         jack_ringbuffer_write(handle->midi_ringbuffer, in_event.buffer, in_event.size);
     }
@@ -149,7 +149,7 @@ static PyObject *pysdr_jack_gather_samples(PyObject *self, PyObject *args)
         Py_INCREF(Py_None);
         return Py_None;
     }
-    
+
     float *samples = (float *) PyDataMem_NEW(sizeof(float) * 2 * frames_no);
 
     if (!samples) {
@@ -165,7 +165,7 @@ static PyObject *pysdr_jack_gather_samples(PyObject *self, PyObject *args)
     npy_intp dims[1] = { frames_no };
     PyObject *array = PyArray_SimpleNewFromData(1, dims, NPY_COMPLEX64, samples);
 
-    ((PyArrayObject *) array)->flags |= NPY_OWNDATA; 
+    ((PyArrayObject *) array)->flags |= NPY_OWNDATA;
 
     return array;
 }
@@ -187,8 +187,8 @@ static PyObject *pysdr_jack_gather_midi_event(PyObject *self, PyObject *args)
         return Py_None;
     }
 
-    jack_nframes_t time;
-    jack_ringbuffer_read(handle->midi_ringbuffer, &time, sizeof(jack_nframes_t));
+    uint64_t time;
+    jack_ringbuffer_read(handle->midi_ringbuffer, &time, sizeof(uint64_t));
     size_t size;
     jack_ringbuffer_read(handle->midi_ringbuffer, &size, sizeof(size_t));
 
@@ -201,7 +201,7 @@ static PyObject *pysdr_jack_gather_midi_event(PyObject *self, PyObject *args)
 
     jack_ringbuffer_read(handle->midi_ringbuffer, PyString_AsString(string), size);
 
-    return Py_BuildValue("(IN)", time, string);
+    return Py_BuildValue("(KN)", time, string);
 }
 
 float interpolate(float val, float x0, float x1, float y0, float y1)
@@ -215,14 +215,14 @@ float mag2col_base(float val)
         return 0;
 
     if (val <= -0.5)
-        return interpolate(val, -1, -0.5, 0.0, 1.0); 
+        return interpolate(val, -1, -0.5, 0.0, 1.0);
 
     if (val <= 0.5)
         return 1.0;
 
     if (val <= 1)
         return interpolate(val, 0.5, 1.0, 1.0, 0.0);
-    
+
     return 0.0;
 }
 
