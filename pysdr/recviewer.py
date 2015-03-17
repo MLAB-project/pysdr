@@ -156,7 +156,7 @@ def read_file(filename):
             raise Exception("width %d is not a multiple of 2" % (size[0],))
 
         flat_data = np.ravel(img.data)
-        return (44800, flat_data[0::2] + 1j * flat_data[1::2])
+        return (48000, flat_data[0::2] + 1j * flat_data[1::2])
     else:
         raise Exception("unknown filename extension: %s" % (ext,))
 
