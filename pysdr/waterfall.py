@@ -7,6 +7,7 @@ import threading
 import numpy as np
 import argparse
 import signal
+import time
 
 from OpenGL.GL import *
 from OpenGL.GLUT import *
@@ -14,7 +15,7 @@ from OpenGL.GLU import *
 
 from pysdr.graph import MultiTexture, PlotLine
 from pysdr.input import RawSigInput, JackInput
-from pysdr.overlay import View, PlotAxes, static_axis, UNIT_HZ, UNIT_SEC, _axis
+from pysdr.overlay import View, PlotAxes, static_axis, UNIT_HZ, UNIT_SEC, _axis, time_of_day_axis
 from pysdr.console import Console
 from pysdr.commands import make_commands_layer
 from pysdr.events import EventMarker, DetectorScript, MIDIEventGatherer
@@ -246,7 +247,7 @@ class RangeSelector():
             return False
 
 class WaterfallWindow(Viewer):
-    def __init__(self, sig_input, bins, overlap=0):
+    def __init__(self, sig_input, bins, overlap=0, start_time=None):
         if bins % 1024 != 0:
             raise NotImplementedError("number of bins must be a multiple of 1024")
 
@@ -262,10 +263,12 @@ class WaterfallWindow(Viewer):
         self.row_duration = float(bins - overlap) / sig_input.sample_rate
         self.multitexture = MultiTexture(1024, 1024, self.bins / 1024, 1)
 
+        self.start_time = time.time() if start_time is None else start_time
+
         def time_axis(a, b):
             scale = self.row_duration * self.multitexture.get_height()
-            return _axis(a, b, scale, self.row_duration * self.texture_row - scale,
-                         UNIT_SEC, (0.0, 1.0))
+            shift = self.row_duration * self.texture_row - scale + self.start_time % (3600 * 24)
+            return time_of_day_axis(a, b, scale, shift, UNIT_SEC, (0.0, 1.0))
 
         self.overlay = PlotAxes(self, static_axis(UNIT_HZ, sig_input.sample_rate / 2,
                                                   cutoff=(-1.0, 1.0)), time_axis)
@@ -383,6 +386,21 @@ class Label:
         glColor4f(1.0, 1.0, 1.0, 0.75)
         Console.draw_string(x, y, self.content)
 
+class DateLabel:
+    def __init__(self, viewer):
+        self.viewer = viewer
+
+    def draw_screen(self):
+        d = "2015-05-22"
+        strlen = len(d)
+
+        w, h = self.viewer.screen_size
+        x, y = w - 10 - strlen * Console.CHAR_WIDTH, 10 + Console.CHAR_HEIGHT
+        Label.draw_bg(x, y - 2, Console.CHAR_WIDTH * strlen, Console.CHAR_HEIGHT, padding=3)
+
+        glColor4f(1.0, 1.0, 1.0, 1.0)
+        Console.draw_string(x, y, d)
+
 def main():
     signal.signal(signal.SIGINT, lambda a, b: sys.exit(0))
 
@@ -431,7 +449,10 @@ def main():
         viewer.layers += [midi_em, MIDIEventGatherer(viewer, [midi_em])]
 
     viewer.layers += [make_commands_layer(viewer), RangeSelector(viewer),
-                      Label(viewer, str(viewer.sig_input)), Console(viewer, globals())]
+                      Label(viewer, str(viewer.sig_input)),
+# TODO
+#                      DateLabel(viewer),
+                      Console(viewer, globals())]
 
     viewer.start()
 

@@ -86,6 +86,41 @@ def _axis(a, b, scale, offset, unit, cutoff):
 def static_axis(unit, scale, cutoff=(0.0, 1.0), offset=0.0):
     return lambda a, b: _axis(a, b, scale, offset, unit, cutoff)
 
+def hms_base(a):
+    for s in [1, 60]:
+        for x in [1, 2, 3, 5, 10, 20, 30, 60]:
+            if a / (s * x) < 10:
+                return x * s
+
+    return 3600 * 60
+
+def time_of_day_axis(a, b, scale, offset, unit, cutoff):
+    visible_area = abs((b - a) * scale)
+
+    if visible_area < 10:
+        base = math.log(visible_area, 10)
+
+        for x in [math.log10(5), math.log10(2), 0]:
+            if math.floor(base) - x >= base - (1 + 1e-5):
+                base = math.floor(base) - x
+                break
+
+        base = 10 ** base * (scale / abs(scale))
+    else:
+        base = float(hms_base(visible_area))
+
+    ticks = [((m * base - offset) / scale, m * base) for m
+             in range(int(math.floor((a * scale + offset) / base)),
+                      int(math.ceil((b * scale + offset) / base) + 1))]
+    ticks = [m for m in ticks if m[0] >= cutoff[0] + -1e-5 and m[0] <= cutoff[1] + 1e-5]
+
+    digits = max(0, math.ceil(-math.log10(base)))
+
+    fmt_str = "%%02d:%%02d:%%02.%df" % digits
+    fmt = lambda a: fmt_str % ((a / 3600) % 24, (a / 60) % 60, a % 60)
+
+    return [(m[0], fmt(m[1])) for m in ticks]
+
 class PlotAxes:
     def __init__(self, viewer, axis_x, axis_y):
         self.viewer = viewer
