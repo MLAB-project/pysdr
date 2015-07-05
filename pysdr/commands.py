@@ -31,7 +31,7 @@ def screenshot(viewer):
         image = np.zeros((resolution[1], resolution[0], 3), dtype=np.uint8)
         glReadPixels(0, 0, resolution[0], resolution[1], GL_RGB, GL_UNSIGNED_BYTE, image)
 
-        Image.fromarray(image[::-1,:,:].copy()).save(time.strftime("screenshot_%Y%m%d%H%M%S.bmp",
+        Image.fromarray(image[::-1,:,:].copy()).save(time.strftime("screenshot_%Y%m%d%H%M%S.png",
                                                                    time.gmtime()))
     except Exception as e:
         print e
