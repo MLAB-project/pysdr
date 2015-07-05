@@ -403,6 +403,8 @@ class DateLabel:
         Console.draw_string(x, y, d)
 
 def main():
+    global viewer # so that it can be accessed from the embedded console
+
     signal.signal(signal.SIGINT, lambda a, b: sys.exit(0))
 
     parser = argparse.ArgumentParser(description='Plot live spectral waterfall of a quadrature signal.')
@@ -417,7 +419,7 @@ def main():
                         help='feed signal from JACK and use the given client name \
                                 (by default, with name \'pysdr\')')
     parser.add_argument('-r', '--raw', metavar='RATE', type=int,
-                        help='feed signal from the standard input, 2 channel \
+                        help='feed signal from the standard input, expects 2 channel \
                                 interleaved floats with the given samplerate')
     parser.add_argument('-d', '--detector', metavar='FILENAME', action='append',
                         help='attach the given detector script')
@@ -435,7 +437,7 @@ def main():
     if not (overlap_bins >= 0 and overlap_bins < args.bins):
         raise ValueError("number of overlapping bins is out of bounds")
 
-    if args.raw:
+    if args.raw is not None:
         sig_input = RawSigInput(args.raw, 2, np.dtype(np.float32), sys.stdin)
     else:
         sig_input = JackInput(args.jack)

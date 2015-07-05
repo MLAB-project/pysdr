@@ -1,3 +1,5 @@
+#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+
 #include "Python.h"
 #include "math.h"
 #include "numpy/ndarraytypes.h"
@@ -32,14 +34,43 @@ int pysdr_jack_process(jack_nframes_t nframes, void *arg)
     float* i = (float *) jack_port_get_buffer(handle->port_i, nframes);
     float* q = (float *) jack_port_get_buffer(handle->port_q, nframes);
 
-    int x;
-    for (x = 0; x < nframes; x++) {
-        if (jack_ringbuffer_write(handle->ringbuffer, (const char *) &(i[x]),
-                                    sizeof(float)) < sizeof(float))
-            handle->overrun++;
-        if (jack_ringbuffer_write(handle->ringbuffer, (const char *) &(q[x]),
-                                    sizeof(float)) < sizeof(float))
-            handle->overrun++;
+    jack_ringbuffer_data_t vec[2];
+    jack_ringbuffer_get_write_vector(handle->ringbuffer, vec);
+
+    if (vec[0].len + vec[1].len < nframes * sizeof(float) * 2) {
+        handle->overrun++;
+        nframes = (vec[0].len + vec[1].len) / (sizeof(float) * 2);
+    }
+
+    jack_ringbuffer_write_advance(handle->ringbuffer, nframes * 2 * sizeof(float));
+
+    char middle_of_frame = 0;
+    int x = 0;
+    int m;
+    for (m = 0; m < 2; m++) {
+        float *cpos = (float *) vec[m].buf;
+        float *epos = ((float *) (vec[m].buf + vec[m].len)) - 1;
+
+        if (middle_of_frame) {
+            *cpos++ = q[x];
+            x++;
+            middle_of_frame = 0;
+        }
+
+        while (cpos < epos && x < nframes) {
+            *cpos++ = i[x];
+            *cpos++ = q[x];
+            x++;
+        }
+
+        if (x >= nframes)
+            break;
+
+        if (cpos == epos) {
+            *cpos++ = i[x];
+            middle_of_frame = 1;
+        }
+
     }
 
     void* midi_buf = jack_port_get_buffer(handle->port_events, nframes);
@@ -55,9 +86,9 @@ int pysdr_jack_process(jack_nframes_t nframes, void *arg)
 
         uint64_t time = handle->nframes + in_event.time;
 
-        jack_ringbuffer_write(handle->midi_ringbuffer, &time, sizeof(uint64_t));
-        jack_ringbuffer_write(handle->midi_ringbuffer, &(in_event.size), sizeof(size_t));
-        jack_ringbuffer_write(handle->midi_ringbuffer, in_event.buffer, in_event.size);
+        jack_ringbuffer_write(handle->midi_ringbuffer, (char *) &time, sizeof(uint64_t));
+        jack_ringbuffer_write(handle->midi_ringbuffer, (char *) &(in_event.size), sizeof(size_t));
+        jack_ringbuffer_write(handle->midi_ringbuffer, (char *) in_event.buffer, in_event.size);
     }
 
     handle->nframes += nframes;
@@ -164,8 +195,7 @@ static PyObject *pysdr_jack_gather_samples(PyObject *self, PyObject *args)
 
     npy_intp dims[1] = { frames_no };
     PyObject *array = PyArray_SimpleNewFromData(1, dims, NPY_COMPLEX64, samples);
-
-    ((PyArrayObject *) array)->flags |= NPY_OWNDATA;
+    PyArray_ENABLEFLAGS((PyArrayObject *) array, NPY_ARRAY_OWNDATA);
 
     return array;
 }
@@ -188,9 +218,9 @@ static PyObject *pysdr_jack_gather_midi_event(PyObject *self, PyObject *args)
     }
 
     uint64_t time;
-    jack_ringbuffer_read(handle->midi_ringbuffer, &time, sizeof(uint64_t));
+    jack_ringbuffer_read(handle->midi_ringbuffer, (char *) &time, sizeof(uint64_t));
     size_t size;
-    jack_ringbuffer_read(handle->midi_ringbuffer, &size, sizeof(size_t));
+    jack_ringbuffer_read(handle->midi_ringbuffer, (char *) &size, sizeof(size_t));
 
     PyObject *string;
 
