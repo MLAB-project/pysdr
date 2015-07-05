@@ -19,7 +19,7 @@ from pysdr.overlay import View, PlotAxes, static_axis, UNIT_HZ, UNIT_SEC, _axis,
 from pysdr.console import Console
 from pysdr.commands import make_commands_layer
 from pysdr.events import EventMarker, DetectorScript, MIDIEventGatherer
-from pysdr.persistance import pers_load, pers_save
+from pysdr.persistence import pers_load, pers_save
 import pysdr.ext as ext
 
 class Viewer:

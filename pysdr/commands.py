@@ -7,7 +7,7 @@ from OpenGL.GL.ARB.framebuffer_object import *
 from OpenGL.GL.EXT.framebuffer_object import *
 
 from pysdr.overlay import View
-from pysdr.persistance import pers_save
+from pysdr.persistence import pers_save
 
 class KeyTriggers:
     def __init__(self, cmds):
