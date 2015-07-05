@@ -7,6 +7,7 @@ from OpenGL.GL.ARB.framebuffer_object import *
 from OpenGL.GL.EXT.framebuffer_object import *
 
 from pysdr.overlay import View
+from pysdr.persistance import pers_save
 
 class KeyTriggers:
     def __init__(self, cmds):
@@ -133,5 +134,6 @@ def make_commands_layer(viewer):
         's': (screenshot, (viewer,)),
         't': (textureshot, (viewer,)),
         'c': (mag_range_calibration, (viewer,)),
-        'm': (align_pixels, (viewer,))
+        'm': (align_pixels, (viewer,)),
+        'p': (lambda v: pers_save(v, v.persfn), (viewer,))
     })

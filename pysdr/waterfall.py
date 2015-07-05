@@ -19,6 +19,7 @@ from pysdr.overlay import View, PlotAxes, static_axis, UNIT_HZ, UNIT_SEC, _axis,
 from pysdr.console import Console
 from pysdr.commands import make_commands_layer
 from pysdr.events import EventMarker, DetectorScript, MIDIEventGatherer
+from pysdr.persistance import pers_load, pers_save
 import pysdr.ext as ext
 
 class Viewer:
@@ -418,8 +419,14 @@ def main():
     parser.add_argument('-r', '--raw', metavar='RATE', type=int,
                         help='feed signal from the standard input, 2 channel \
                                 interleaved floats with the given samplerate')
-    parser.add_argument('-d', '--detector', metavar='FILENAME', action='append', \
+    parser.add_argument('-d', '--detector', metavar='FILENAME', action='append',
                         help='attach the given detector script')
+    parser.add_argument('-p', '--persfn', metavar='FILENAME',
+                        help='a file in which to preserve the visualization parameters \
+                                that come from interactive manipulation, \
+                                i.e. the visible area of the waterfall \
+                                and the selected magnitude range \
+                                (saving is triggered by the key \'p\')')
 
     args = parser.parse_args()
 
@@ -453,6 +460,10 @@ def main():
 # TODO
 #                      DateLabel(viewer),
                       Console(viewer, globals())]
+
+    if args.persfn is not None:
+        viewer.persfn = args.persfn
+        pers_load(viewer, args.persfn)
 
     viewer.start()
 
