@@ -10,7 +10,7 @@ Plots live spectral waterfall of a quadrature signal which can be taken either f
 
 	$ pysdr-waterfall -h
 	usage: pysdr-waterfall [-h] [-b BINS] [-H HEIGHT] [-o OVERLAP] [-j NAME]
-	                       [-r RATE] [-d FILENAME]
+	                       [-r RATE] [-d FILENAME] [-p CONFIG_FILE]
 	
 	Plot live spectral waterfall of a quadrature signal.
 	
@@ -29,7 +29,8 @@ Plots live spectral waterfall of a quadrature signal which can be taken either f
 	                        interleaved floats with the given samplerate
 	  -d FILENAME, --detector FILENAME
 	                        attach the given detector script
-
+      -p CONFIG_FILE,       configuration file to which the waterfall display configuration is saved. 
+                            Configuration stored in file is updated by pressing of "p" key. 
 ### Example usage with ALSA
 
 	$ arecord -f FLOAT_LE -c 2 -r 44100 --buffer-size 1024 | pysdr-waterfall -r 44100
