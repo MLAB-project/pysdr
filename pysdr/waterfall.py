@@ -19,20 +19,32 @@ from pysdr.commands import make_commands_layer
 from pysdr.events import EventMarker, DetectorScript, MIDIEventGatherer
 import pysdr.ext as ext
 
+
 class Viewer:
-    def __init__(self, window_name):
-        glutCreateWindow(window_name)
-        glutDisplayFunc(self.cb_display)
-        glutMouseFunc(self.cb_mouse)
-        glutMotionFunc(self.cb_motion)
-        glutReshapeFunc(self.cb_reshape)
-        glutKeyboardFunc(self.cb_keyboard)
+    def __init__(self, window_name, skip_glut=False,
+                 swap_buffers=None, post_redisplay=None):
+
+        if not skip_glut:
+            glutCreateWindow(window_name)
+            glutDisplayFunc(self.cb_display)
+            glutMouseFunc(self.cb_mouse)
+            glutMotionFunc(self.cb_motion)
+            glutReshapeFunc(self.cb_reshape)
+            glutKeyboardFunc(self.cb_keyboard)
+
+        self.swap_buffers = swap_buffers or glutSwapBuffers
+        self.post_redisplay = post_redisplay or glutPostRedisplay
 
         self.init()
         self.view = View()
         self.buttons_pressed = []
 
         self.layers = [self, self.view]
+
+    def draw_string(self, x, y, string):
+        glWindowPos2i(x, y)
+        for c in string:
+            glutBitmapCharacter(GLUT_BITMAP_8_BY_13, ord(c))
 
     def init(self):
         pass
@@ -60,7 +72,7 @@ class Viewer:
 
         self.call_layers('draw_screen')
 
-        glutSwapBuffers()
+        self.swap_buffers()
 
     def cb_mouse(self, button, state, x, y):
         if state == GLUT_DOWN:
@@ -75,7 +87,7 @@ class Viewer:
         self.call_layers_handler('on_mouse_button', (button, state, x,
                                                      self.screen_size[1] - y))
 
-        glutPostRedisplay()
+        self.post_redisplay()
 
     def cb_motion(self, x, y):
         if len(self.buttons_pressed) == 0:
@@ -83,9 +95,10 @@ class Viewer:
 
         self.call_layers_handler('on_drag', (x, self.screen_size[1] - y))
 
-        glutPostRedisplay()
+        self.post_redisplay()
 
     def cb_reshape(self, w, h):
+        print w, h
         glViewport(0, 0, w, h)
         glMatrixMode(GL_PROJECTION)
         glLoadIdentity()
@@ -98,7 +111,7 @@ class Viewer:
 
     def cb_keyboard(self, key, x, y):
         self.call_layers_handler('on_key_press', (key))
-        glutPostRedisplay()
+        self.post_redisplay()
 
     def get_layer(self, type):
         a = [a for a in self.layers if a.__class__ == type]
@@ -245,12 +258,14 @@ class RangeSelector():
             return False
 
 class WaterfallWindow(Viewer):
-    def __init__(self, sig_input, bins, overlap=0):
+    def __init__(self, sig_input, bins, overlap=0, **kwargs):
         if bins % 1024 != 0:
             raise NotImplementedError("number of bins must be a multiple of 1024")
 
-        Viewer.__init__(self, "PySDR")
-        glutIdleFunc(self.cb_idle)
+        Viewer.__init__(self, "PySDR", **kwargs)
+
+        if not kwargs.get('skip_glut', False):
+            glutIdleFunc(self.cb_idle)
 
         self.mag_range = (-45, 5)
 
@@ -307,19 +322,27 @@ class WaterfallWindow(Viewer):
     def row_to_y(self, row):
         return float(row - self.texture_row) / self.multitexture.get_height() + 1.0
 
-    def cb_idle(self):
+    def cb_idle(self, call_post_redisplay=True, no_timeout=False):
+        new = False
+
         try:
             while True:
-                rec = self.texture_inserts.get(block=True, timeout=0.01)
+                if no_timeout:
+                    rec = self.texture_inserts.get(block=False)
+                else:
+                    rec = self.texture_inserts.get(block=True, timeout=0.01)
                 self.multitexture.insert(self.texture_edge, rec)
                 self.texture_row = self.texture_row + 1
                 self.texture_edge = self.texture_row % self.multitexture.get_height()
 
                 self.call_layers('on_texture_insert')
 
-                glutPostRedisplay()
+                new = True
+
+                if call_post_redisplay:
+                    self.post_redisplay()
         except Queue.Empty:
-            return
+            return new
 
     def process(self):
         ringbuf = np.zeros(self.bins * 4, dtype=np.complex64)
@@ -428,7 +451,7 @@ def main():
         viewer.layers += [midi_em, MIDIEventGatherer(viewer, [midi_em])]
 
     viewer.layers += [make_commands_layer(viewer), RangeSelector(viewer),
-                      Label(viewer, str(viewer.sig_input)), Console(viewer, globals())]
+                      Label(viewer, str(viewer.sig_input)), Console(viewer, locals())]
 
     viewer.start()
 

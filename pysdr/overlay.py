@@ -93,9 +93,10 @@ class PlotAxes:
 
     def draw_text_ss(self, x, y, text):
         x, y = self.viewer.view.screen_offset[0] + x, self.viewer.view.screen_offset[1] + y
-        glWindowPos2i(int(x), int(y))
-        for c in text:
-            glutBitmapCharacter(GLUT_BITMAP_8_BY_13, ord(c))
+        #glWindowPos2i(int(x), int(y))
+        #for c in text:
+        #   glutBitmapCharacter(GLUT_BITMAP_8_BY_13, ord(c))
+        self.viewer.draw_string(x, y, text)
 
     def draw_text(self, x, y, text):
         glPushMatrix()
