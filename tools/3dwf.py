@@ -371,7 +371,7 @@ def input_thread(fil, ringbuf, nbins, overlap, viewer):
 def main():
     nbins = 256
     overlap = 192
-    rem_address = ('10.1.1.136', 2000)
+    rem_address = (sys.argv[1], 3731)
 
     conn = socket.create_connection(rem_address)
 
