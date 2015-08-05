@@ -363,7 +363,7 @@ def input_thread(fil, ringbuf, nbins, overlap, viewer):
         spectrum = np.absolute(np.fft.fft(np.multiply(frame, window)))
         spectrum = np.concatenate((spectrum[nbins/2:nbins], spectrum[0:nbins/2]))
         spectrum = np.log10(spectrum) * 10
-        viewer.inserts.put(spectrum / 20.0 + 1.6)
+        viewer.inserts.put(spectrum / 20.0 + 2.5)
 
         sdl2.SDL_PushEvent(UPDATE_EVENT)
 
@@ -414,7 +414,7 @@ def main():
             audio_edge = 0
 
         slic = ringbuf.slice(audio_edge - filt.nhistory, audio_edge + nreqframes)
-        array[:] = np.real(freqx(filt(slic))) * 100
+        array[:] = np.real(freqx(filt(slic))) * 1000
         audio_edge += nreqframes
         sdl2.SDL_PushEvent(UPDATE_EVENT)
 
