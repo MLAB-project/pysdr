@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+from __future__ import print_function
+
 import math
 import gzip
 import ctypes
@@ -14,11 +16,15 @@ import Queue as queue
 
 from OpenGL.GL import *
 from OpenGL.GL import shaders
-from OpenGL.arrays import vbo
+from OpenGL.arrays import vbo, GLOBAL_REGISTRY
 from OpenGL.GLUT import *
 
 import threading
 
+
+if np.float32 not in GLOBAL_REGISTRY:
+    from OpenGL.arrays.numpymodule import NumpyHandler
+    NumpyHandler().register(np.float32)
 
 pybuf_from_memory = ctypes.pythonapi.PyBuffer_FromReadWriteMemory
 pybuf_from_memory.restype = ctypes.py_object
@@ -29,8 +35,8 @@ class Waterfall3D:
         self.history = history
         self.points = points
         self.last_line = np.zeros(points, dtype=np.float32)
-        self.vbo = vbo.VBO(np.zeros((points - 1) * 4 * self.history * 3, dtype=np.float32),
-                           usage='GL_STREAM_DRAW_ARB')
+        self.vbo = vbo.VBO(np.zeros((points - 1) * 4 * self.history * 3,
+                           dtype=np.float32), usage='GL_STREAM_DRAW_ARB')
         self.vbo_edge = 0
         self.nrows = 0
 
@@ -99,7 +105,7 @@ class Waterfall3D:
         vbo_edge = self.nrows % self.history
 
         strip_nvertices = (self.points - 1) * 4
-        strip = np.zeros((strip_nvertices, 3))
+        strip = np.zeros((strip_nvertices, 3), dtype=np.float32)
         strip[:,0] = np.repeat(np.arange(self.points, dtype=np.float32) / (self.points - 1), 4)[2:-2]
         strip[:,1] = np.tile((np.array([1.0, 0.0, 0.0, 1.0]) + vbo_edge) / self.history, self.points - 1)
         strip[0::4,2] = line[0:-1]
@@ -108,7 +114,7 @@ class Waterfall3D:
         strip[2::4,2] = self.last_line[1::]
 
         self.vbo[len(self.vbo) - (vbo_edge + 1) * strip_nvertices * 3 \
-                    :len(self.vbo) - vbo_edge * strip_nvertices * 3] = strip.flatten()
+                 :len(self.vbo) - vbo_edge * strip_nvertices * 3] = strip.flatten()
 
         self.nrows = self.nrows + 1
         self.last_line = line
@@ -348,7 +354,6 @@ UPDATE_EVENT = sdl2.SDL_Event()
 UPDATE_EVENT.type = UPDATE_EVENT_TYPE
 
 
-
 def input_thread(fil, ringbuf, nbins, overlap, viewer):
     window = 0.5 * (1.0 - np.cos((2 * math.pi * np.arange(nbins)) / nbins))
 
@@ -369,6 +374,10 @@ def input_thread(fil, ringbuf, nbins, overlap, viewer):
 
 
 def main():
+    if len(sys.argv) != 2:
+        print("usage: 3dwf.py REMOTE_ADDRESS", file=sys.stderr)
+        sys.exit(1)
+
     nbins = 256
     overlap = 192
     rem_address = (sys.argv[1], 3731)
@@ -406,7 +415,7 @@ def main():
 
         loc_ringbuf_edge = ringbuf.fill_edge
         if loc_ringbuf_edge < 0 or (loc_ringbuf_edge - audio_edge) % len(ringbuf) < nreqframes:
-            print "audio underrun"
+            print("audio underrun", file=sys.stderr)
             return
 
         # TODO
@@ -414,7 +423,7 @@ def main():
             audio_edge = 0
 
         slic = ringbuf.slice(audio_edge - filt.nhistory, audio_edge + nreqframes)
-        array[:] = np.real(freqx(filt(slic))) * 1000
+        array[:] = np.real(freqx(filt(slic))) * 10000
         audio_edge += nreqframes
         sdl2.SDL_PushEvent(UPDATE_EVENT)
 
