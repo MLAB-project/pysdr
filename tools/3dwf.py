@@ -8,6 +8,9 @@ import ctypes
 import socket
 import numpy as np
 
+import os
+os.environ['PYSDL2_DLL_PATH'] = '.'
+
 import sdl2
 import sdl2.ext
 
