@@ -2,6 +2,7 @@
 
 from __future__ import print_function
 
+import sys
 import math
 import gzip
 import ctypes
@@ -16,8 +17,8 @@ import Queue as queue
 
 from OpenGL.GL import *
 from OpenGL.GL import shaders
+from OpenGL.GLU import gluOrtho2D
 from OpenGL.arrays import vbo, GLOBAL_REGISTRY
-from OpenGL.GLUT import *
 
 import threading
 
@@ -28,6 +29,50 @@ if np.float32 not in GLOBAL_REGISTRY:
 
 pybuf_from_memory = ctypes.pythonapi.PyBuffer_FromReadWriteMemory
 pybuf_from_memory.restype = ctypes.py_object
+
+
+FONT_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"
+
+font_manager = sdl2.ext.FontManager(FONT_PATH)
+text_cache = dict()
+
+def render_text(text):
+    if text not in text_cache:
+        surface = font_manager.render(text)
+
+        texture = gl.glGenTextures(1)
+
+        a = np.zeros((surface.h, surface.w), dtype=np.uint32)
+        a[:,:] = sdl2.ext.pixels2d(surface).transpose()
+
+        gl.glEnable(GL_TEXTURE_2D)
+        gl.glBindTexture(gl.GL_TEXTURE_2D, texture)
+        gl.glTexImage2D(gl.GL_TEXTURE_2D, 0, gl.GL_RGBA, surface.w, surface.h, 0,
+                        gl.GL_BGRA, gl.GL_UNSIGNED_INT_8_8_8_8_REV, a)
+        gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+        gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR) # TODO: gl prefix?
+        gl.glDisable(GL_TEXTURE_2D)
+        text_cache[text] = {'surf': surface, 'text': texture}
+
+    surf = text_cache[text]['surf']
+    texture = text_cache[text]['text']
+
+    gl.glColor4f(1.0, 1.0, 1.0, 1.0)
+    gl.glEnable(gl.GL_TEXTURE_2D)
+    gl.glBindTexture(gl.GL_TEXTURE_2D, texture)
+
+    gl.glBegin(GL_QUADS)
+    glTexCoord2i(0, 1)
+    gl.glVertex2i(0, 0)
+    glTexCoord2i(0, 0)
+    gl.glVertex2i(0, surf.h)
+    glTexCoord2i(1, 0)
+    gl.glVertex2i(surf.w, surf.h)
+    glTexCoord2i(1, 1)
+    gl.glVertex2i(surf.w, 0)
+    gl.glEnd()
+
+    gl.glDisable(gl.GL_TEXTURE_2D)
 
 
 class Waterfall3D:
@@ -47,11 +92,13 @@ class Waterfall3D:
                 height = gl_Vertex.z;
                 gl_Position = ftransform();
             }
-            """, GL_VERTEX_SHADER)
+            """, gl.GL_VERTEX_SHADER)
 
         frag_shader = shaders.compileShader("""
             #version 130
             varying float height;
+            uniform float scale;
+            uniform float offset;
 
             float mag2col_base2(float val)
             {
@@ -84,17 +131,15 @@ class Waterfall3D:
             }
 
             vec3 mag2col(float a) {
-                a *= 2.8;
-                a -= 2.3;
                 return vec3(mag2col_base2(a + 1.0), mag2col_base2(a),
                             mag2col_base2_blue(a - 1.0));
             }
 
             void main() {
                 //gl_FragColor = vec4(height, 1 - height, height, 1 );
-                gl_FragColor = vec4(mag2col(height), 1);
+                gl_FragColor = vec4(mag2col(offset + height * scale), 1);
             }
-            """, GL_FRAGMENT_SHADER)
+            """, gl.GL_FRAGMENT_SHADER)
         self.shader = shaders.compileProgram(vertex_shader,frag_shader)
 
     def set(self, content):
@@ -119,10 +164,14 @@ class Waterfall3D:
         self.nrows = self.nrows + 1
         self.last_line = line
 
-    def draw_scroll(self):
+    def draw_scroll(self, offset, scale):
         glPushMatrix()
 
         shaders.glUseProgram(self.shader)
+
+        glUniform1f(glGetUniformLocation(self.shader, "offset"), offset)
+        glUniform1f(glGetUniformLocation(self.shader, "scale"), scale)
+
         self.vbo.bind()
         glColor4f(1.0, 0.0, 0.0, 1.0)
         glEnableClientState(GL_VERTEX_ARRAY)
@@ -213,12 +262,96 @@ def screen2world(m, x, y):
     a = np.dot(m, np.array([x, y, 1.0, 1.0]))
     return a[0:3] / a[3]
 
+class Slider:
+    def __init__(self, ori_x, ori_y, cb, text):
+        self.sliding = False
+        self.origin_x = ori_x
+        self.origin_y = ori_y
+        self.text = text
+        self.cb = cb
+        self.start_pos = 100
+        self.pos = self.start_pos
+
+    def draw(self):
+        gl.glPushMatrix()
+
+        gl.glTranslatef(self.origin_x, self.origin_y, 0)
+
+        gl.glColor4f(1.0, 1.0, 1.0, 1.0)
+        render_text(self.text)
+
+#        gl.glPushMatrix()
+#        gl.glTranslatef(self.pos - 100, 0, 0)
+#        gl.glBegin(GL_LINES)
+#        gl.glVertex2i(95, 14)
+#        gl.glVertex2i(85, 10)
+#        gl.glVertex2i(95, 6)
+#        gl.glVertex2i(85, 10)
+#
+#        gl.glVertex2i(125, 14)
+#        gl.glVertex2i(135, 10)
+#        gl.glVertex2i(125, 6)
+#        gl.glVertex2i(135, 10)
+#        gl.glEnd()
+#        gl.glPopMatrix()
+
+        gl.glColor4f(0.7, 0.7, 0.7, 0.4)
+        gl.glBegin(GL_QUADS)
+        gl.glVertex2i(self.pos, 0)
+        gl.glVertex2i(self.pos, 20)
+        gl.glVertex2i(self.pos + 20, 20)
+        gl.glVertex2i(self.pos + 20, 0)
+        gl.glEnd()
+
+        gl.glPopMatrix()
+
+    def event(self, event):
+        if self.sliding:
+            if event.type == sdl2.SDL_MOUSEBUTTONUP:
+                self.pos = self.start_pos
+                self.sliding = False
+                return True
+
+            if event.type == sdl2.SDL_MOUSEMOTION:
+                new_pos = self.start_pos + (event.motion.x - self.start_x)
+                self.cb(new_pos - self.pos)
+                self.pos = new_pos
+                return True
+
+        if event.type == sdl2.SDL_MOUSEBUTTONDOWN and (event.motion.state & sdl2.SDL_BUTTON_LEFT) \
+                and self.origin_x + self.pos <= event.motion.x <= self.origin_y + self.pos + 20 \
+                and self.origin_y <= event.motion.y <= 20 + self.origin_y:
+            self.sliding = True
+            self.start_x = event.motion.x
+            return True
+
+        return False
 
 class WFViewer:
     def __init__(self, bins):
         self.view_inv = self.view = self.modelview = np.eye(4)
         self.waterfall = Waterfall3D(bins, history=500)
         self.inserts = queue.Queue()
+
+        self.color_offset = 1.0
+        self.color_scale = 1.0
+        self.volume = 100.0
+
+        def offset_func(name):
+            def func(a):
+                self.__dict__[name] += float(a) / 100.0
+            return func
+
+        def scale_func(name, ratio=0.01):
+            def func(a):
+                self.__dict__[name] *= 2 ** (float(a) * ratio)
+            return func
+
+        self.sliders = [
+            Slider(20, 20, offset_func('color_offset'), 'offset'),
+            Slider(20, 42, scale_func('color_scale'), 'contrast'),
+            Slider(20, 64, scale_func('volume', ratio=0.05), 'volume'),
+        ]
 
     def init(self, w, h):
         gl.glEnable(gl.GL_DEPTH_TEST)
@@ -245,22 +378,70 @@ class WFViewer:
 
         gl.glLoadIdentity()
 
-        mat = np.dot(np.dot(np.dot(translation_matrix(0, 0, -1.5), self.modelview),
-                            scale_matrix(2.0, 1.0, 0.3)), translation_matrix(-0.5, 0.5, -0.5))
+        mat = np.dot(np.dot(np.dot(translation_matrix(0, 0, -3.0), self.modelview),
+                            scale_matrix(2.0, 1.0, 0.3)), translation_matrix(-0.5, 2.5, -0.5))
 
         gl.glMultMatrixf(mat.transpose())
         gl.glColor3f(1.0, 1.0, 1.0)
 
         gl.glTranslatef(0, float(self.shift) / self.waterfall.history, 0)
-        self.waterfall.draw_scroll()
+        gl.glScalef(1.0, 5.0, 1.0)
+        self.waterfall.draw_scroll(self.color_offset, self.color_scale)
+
+        gl.glMatrixMode(gl.GL_PROJECTION)
+        gl.glPushMatrix()
+        gl.glLoadIdentity()
+        gluOrtho2D(0.0, self.screen_size[0], 0.0, self.screen_size[1])
+        gl.glMatrixMode(gl.GL_MODELVIEW)
+        gl.glLoadIdentity()
+        gl.glDisable(gl.GL_DEPTH_TEST)
+        gl.glEnable(gl.GL_BLEND)
+        gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA)
+
+#        gl.glPushMatrix()
+#        gl.glTranslatef(100, 100, 0)
+#
+#        gl.glColor4f(1.0, 1.0, 1.0, 1.0)
+#
+#        gl.glBegin(gl.GL_LINES)
+#        gl.glVertex2i(10, 8)
+#        gl.glVertex2i(0, 4)
+#        gl.glVertex2i(10, 0)
+#        gl.glVertex2i(0, 4)
+#
+#        gl.glVertex2i(35, 8)
+#        gl.glVertex2i(45, 4)
+#        gl.glVertex2i(35, 0)
+#        gl.glVertex2i(45, 4)
+#        gl.glEnd()
+#
+#        gl.glPopMatrix()
+
+        for a in self.sliders:
+            a.draw()
+
+        gl.glDisable(gl.GL_BLEND)
+        gl.glEnable(gl.GL_DEPTH_TEST)
+        gl.glMatrixMode(gl.GL_PROJECTION)
+        gl.glPopMatrix()
+        gl.glMatrixMode(gl.GL_MODELVIEW)
 
     def event2world(self, event):
         v = screen2world(self.projection_inv,
                          float(event.motion.x) / self.screen_size[0] * 2.0 - 1.0,
-                         1.0 - float(event.motion.y) / self.screen_size[1] * 2.0)
+                         float(event.motion.y) / self.screen_size[1] * 2.0 - 1.0)
         return np.dot(self.view_inv, np.concatenate((normv(v), np.array([1]))))[0:3]
 
     def event(self, event):
+        if event.type == sdl2.SDL_MOUSEBUTTONDOWN \
+                or event.type == sdl2.SDL_MOUSEBUTTONUP \
+                or event.type == sdl2.SDL_MOUSEMOTION:
+            event.motion.y = self.screen_size[1] - event.motion.y
+
+        for a in self.sliders:
+            if a.event(event):
+                return True
+
         if event.type == sdl2.SDL_MOUSEBUTTONDOWN and (event.motion.state & sdl2.SDL_BUTTON_LEFT):
             self.drag_start = self.event2world(event)
 
@@ -354,21 +535,21 @@ UPDATE_EVENT = sdl2.SDL_Event()
 UPDATE_EVENT.type = UPDATE_EVENT_TYPE
 
 
-def input_thread(fil, ringbuf, nbins, overlap, viewer):
+def input_thread(readfunc, ringbuf, nbins, overlap, viewer):
     window = 0.5 * (1.0 - np.cos((2 * math.pi * np.arange(nbins)) / nbins))
 
     #ringbuf.append(np.fromfile(fil, count=ringbuf.headlen, dtype=np.complex64))
-    ringbuf.append(np.fromstring(fil.read(ringbuf.headlen * 8), dtype=np.complex64))
+    ringbuf.append(np.fromstring(readfunc(ringbuf.headlen * 8), dtype=np.complex64))
 
     while True:
         #ringbuf.append(np.fromfile(fil, count=nbins - overlap, dtype=np.complex64))
-        ringbuf.append(np.fromstring(fil.read((nbins - overlap) * 8), dtype=np.complex64))
+        ringbuf.append(np.fromstring(readfunc((nbins - overlap) * 8), dtype=np.complex64))
 
         frame = ringbuf.slice(ringbuf.fill_edge - nbins, ringbuf.fill_edge)
         spectrum = np.absolute(np.fft.fft(np.multiply(frame, window)))
         spectrum = np.concatenate((spectrum[nbins/2:nbins], spectrum[0:nbins/2]))
         spectrum = np.log10(spectrum) * 10
-        viewer.inserts.put(spectrum / 20.0 + 2.5)
+        viewer.inserts.put(spectrum / 20.0)
 
         sdl2.SDL_PushEvent(UPDATE_EVENT)
 
@@ -416,6 +597,7 @@ def main():
         loc_ringbuf_edge = ringbuf.fill_edge
         if loc_ringbuf_edge < 0 or (loc_ringbuf_edge - audio_edge) % len(ringbuf) < nreqframes:
             print("audio underrun", file=sys.stderr)
+            array.fill(0)
             return
 
         # TODO
@@ -423,7 +605,7 @@ def main():
             audio_edge = 0
 
         slic = ringbuf.slice(audio_edge - filt.nhistory, audio_edge + nreqframes)
-        array[:] = np.real(freqx(filt(slic))) * 10000
+        array[:] = np.real(freqx(filt(slic))) * wf.volume
         audio_edge += nreqframes
         sdl2.SDL_PushEvent(UPDATE_EVENT)
 
@@ -436,7 +618,31 @@ def main():
     if audio_dev == 0:
         raise Error('could not open audio device')
 
-    other_thread = threading.Thread(target=lambda: input_thread(conn.makefile(), ringbuf, nbins, overlap, wf))
+    err_queue = queue.Queue()
+
+    def readfunc(nbytes):
+        bytes = b''
+
+        while len(bytes) < nbytes:
+            ret = conn.recv(nbytes - len(bytes))
+
+            if not ret:
+                raise Exception('end of stream')
+
+            bytes += ret
+
+        return bytes
+
+    def thread_target():
+        try:
+            input_thread(readfunc, ringbuf, nbins, overlap, wf)
+        except Exception as e:
+            err_queue.put(e)
+            event = sdl2.SDL_Event()
+            event.type = sdl2.SDL_QUIT
+            sdl2.SDL_PushEvent(event)
+
+    other_thread = threading.Thread(target=thread_target)
     other_thread.setDaemon(True)
     other_thread.start()
 
@@ -461,6 +667,12 @@ def main():
         wf.shift = ((ringbuf.fill_edge - audio_edge) % len(ringbuf)) / (nbins - overlap)
         wf.draw()
         sdl2.SDL_GL_SwapWindow(window)
+
+    try:
+        for exc in iter(err_queue.get_nowait, None):
+            sdl2.SDL_ShowSimpleMessageBox(sdl2.SDL_MESSAGEBOX_ERROR, "Exception", str(exc), None)
+    except queue.Empty:
+        pass
 
     sdl2.SDL_CloseAudioDevice(audio_dev)
     sdl2.SDL_GL_DeleteContext(context)
