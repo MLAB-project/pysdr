@@ -496,9 +496,13 @@ def main():
                                 (by default, with name \'pysdr\')')
     parser.add_argument('-r', '--raw', metavar='RATE', type=int,
                         help='feed signal from the standard input, expects 2 channel \
-                                interleaved floats with the given samplerate')
-    parser.add_argument('-d', '--detector', metavar='FILENAME', action='append',
-                        help='attach the given detector script')
+                                interleaved floats with the given sample-rate')
+    parser.add_argument('-d', '--detector', metavar='ARGS', action='append',
+                        help='attach the given detector script, \
+                                expects to be given the script filename \
+                                followed by arguments for the script, \
+                                all joined by spaces and passed on the command-line \
+                                as one quoted argument')
     parser.add_argument('-p', '--persfn', metavar='FILENAME',
                         help='a file in which to preserve the visualization parameters \
                                 that come from interactive manipulation, \
@@ -527,7 +531,7 @@ def main():
     if args.detector:
         detector_em = EventMarker(viewer)
         viewer.layers.append(detector_em)
-        viewer.layers += [DetectorScript(viewer, [detector_em], fn) for fn in args.detector]
+        viewer.layers += [DetectorScript(viewer, [detector_em], a.split()) for a in args.detector]
 
     if isinstance(sig_input, JackInput):
         midi_em = EventMarker(viewer)
