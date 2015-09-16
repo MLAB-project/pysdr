@@ -15,10 +15,11 @@ def coroutine():
         raise Exception("usage: pysdr-waterfall [OTHER_PYSDR_ARGS] -d 'detectors/noise_level.py I2C_CONFIG_FILENAME OUTPUT_FILENAME START_HZ STOP_HZ STEP_HZ'")
 
     cfg = config.Config()
-    cfg.load_python(args[0])
+    cfg.load_file(args[0])
     cfg.initialize()
     fgen = cfg.get_device('clkgen')
-    fgen.reset()
+    fgen.route()
+    fgen.recall_nvm()
 
     for i in sleep(3.0):
         yield
