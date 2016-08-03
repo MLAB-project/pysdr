@@ -188,6 +188,23 @@ class DetectorScript:
             traceback.print_exc(file=sys.stdout)
             self.disabled = True
 
+class ZMQEventGatherer:
+    def __init__(self, viewer, listeners):
+        self.viewer = viewer
+        self.listeners = listeners
+
+    def on_log_spectrum(self, spectrum):
+        for offset, key, value in self.viewer.sig_input.get_events():
+            if key.startswith('mlab.aabb_event.'):
+                rel_frame_a, rel_frame_b, freq_a, freq_b, desc = value
+
+                row_range = tuple([(offset + int(x)) / (self.viewer.bins - self.viewer.overlap)
+                                   for x in (rel_frame_a, rel_frame_b)])
+                bin_range = tuple([self.viewer.freq_to_bin(float(x)) for x in (freq_a, freq_b)])
+
+                payload = row_range + bin_range + (desc,)
+                [l.on_event(key, payload) for l in self.listeners]
+
 class MIDIEventGatherer:
     def __init__(self, viewer, listeners):
         self.viewer = viewer

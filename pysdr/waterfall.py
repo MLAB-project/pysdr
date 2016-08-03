@@ -15,11 +15,11 @@ from OpenGL.GLUT import *
 from OpenGL.GLU import *
 
 from pysdr.graph import MultiTexture, PlotLine
-from pysdr.input import RawSigInput, JackInput
+from pysdr.input import RawSigInput, JackInput, ZMQInput
 from pysdr.overlay import View, PlotAxes, static_axis, UNIT_HZ, UNIT_SEC, _axis, time_of_day_axis
 from pysdr.console import Console
 from pysdr.commands import make_commands_layer
-from pysdr.events import EventMarker, DetectorScript, MIDIEventGatherer
+from pysdr.events import EventMarker, DetectorScript, MIDIEventGatherer, ZMQEventGatherer
 from pysdr.persistence import pers_load, pers_save
 import pysdr.ext as ext
 
@@ -494,6 +494,9 @@ def main():
     parser.add_argument('-j', '--jack', metavar='NAME', default='pysdr',
                         help='feed signal from JACK and use the given client name \
                                 (by default, with name \'pysdr\')')
+    parser.add_argument('-z', '--zeromq', metavar='ADDR',
+                        help='feed signal from ZeroMQ, connect to the given address \
+                                and subscribe to an empty string')
     parser.add_argument('-r', '--raw', metavar='RATE', type=int,
                         help='feed signal from the standard input, expects 2 channel \
                                 interleaved floats with the given sample-rate')
@@ -517,7 +520,9 @@ def main():
     if not (overlap_bins >= 0 and overlap_bins < args.bins):
         raise ValueError("number of overlapping bins is out of bounds")
 
-    if args.raw is not None:
+    if args.zeromq is not None:
+        sig_input = ZMQInput(args.zeromq, args.raw) # TODO: sample rate from args.raw
+    elif args.raw is not None:
         sig_input = RawSigInput(args.raw, 2, np.dtype(np.float32), sys.stdin)
     else:
         sig_input = JackInput(args.jack)
@@ -536,6 +541,10 @@ def main():
     if isinstance(sig_input, JackInput):
         midi_em = EventMarker(viewer)
         viewer.layers += [midi_em, MIDIEventGatherer(viewer, [midi_em])]
+
+    if isinstance(sig_input, ZMQInput):
+        zmq_em = EventMarker(viewer)
+        viewer.layers += [zmq_em, ZMQEventGatherer(viewer, [zmq_em])]
 
     viewer.layers += [make_commands_layer(viewer), RangeSelector(viewer),
                       Label(viewer, str(viewer.sig_input)),
