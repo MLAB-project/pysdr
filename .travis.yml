@@ -1,0 +1,22 @@
+language: python
+
+branches:
+  except:
+      - sound
+
+python:
+  - 2.7
+  - 3.4
+
+before_install:
+  - sudo apt-get install python-numpy python-opengl python-dev libjack-jackd2-dev
+
+# Install packages
+install:
+  - python setup.py build_ext --inplace
+  - python setup.py install
+
+script: pysdr-waterfall -h
+
+dist: trusty
+sudo: required
