@@ -7,7 +7,7 @@ ongoing_event = False
 last_detect_row = None
 meteor_treshold = 0.7
 
-def run(row, spectrum):
+def lin_spectrum_pass(row, spectrum):
     global ongoing_event, last_detect_row
 
     (peak_pow, peak_bin) = peak(freq2bin(10500), freq2bin(10700), spectrum)

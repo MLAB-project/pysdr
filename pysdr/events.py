@@ -140,9 +140,9 @@ class DetectorScript:
     def emit_event(self, event_id, payload):
         [l.on_event(event_id, payload) for l in self.listeners]
 
-    def __init__(self, viewer, listeners, filename):
+    def __init__(self, viewer, listeners, args):
         self.viewer = viewer
-        self.filename = filename
+        self.filename = args[0]
         self.plots = dict()
         self.plot_x_offset = 100
         self.disabled = False
@@ -150,6 +150,7 @@ class DetectorScript:
         self.listeners = listeners
 
         self.namespace = {
+            'args': args[1:],
             'freq2bin': self.viewer.freq_to_bin,
             'bin2freq': self.viewer.bin_to_freq,
             'row_duration': self.viewer.row_duration
@@ -158,7 +159,7 @@ class DetectorScript:
         for name, func in SCRIPT_API_METHODS.items():
             self.namespace[name] = func.__get__(self, DetectorScript)
 
-        execfile(filename, self.namespace)
+        execfile(self.filename, self.namespace)
 
     def draw_screen(self):
         for plot in self.plots.values():
@@ -171,11 +172,17 @@ class DetectorScript:
                 plot.draw_content()
 
     def on_lin_spectrum(self, spectrum):
-        if self.disabled:
+        self.call_script_pass('lin_spectrum_pass', spectrum)
+
+    def on_log_spectrum(self, spectrum):
+        self.call_script_pass('log_spectrum_pass', spectrum)
+
+    def call_script_pass(self, name, spectrum):
+        if name not in self.namespace or self.disabled:
             return
 
         try:
-            self.namespace['run'](self.viewer.process_row, spectrum)
+            self.namespace[name](self.viewer.process_row, spectrum)
         except Exception:
             print "exception in %s, disabling:" % self.filename
             traceback.print_exc(file=sys.stdout)

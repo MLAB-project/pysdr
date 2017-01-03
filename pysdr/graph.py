@@ -51,7 +51,8 @@ class PlotLine:
 
 class MultiTexture():
     """Abstracting grid of textures"""
-    def __init__(self, unit_width, unit_height, units_x, units_y):
+    def __init__(self, unit_width, unit_height, units_x, units_y,
+                 format=GL_RGB, type=GL_BYTE):
         self.unit_width = unit_width
         self.unit_height = unit_height
 
@@ -60,18 +61,21 @@ class MultiTexture():
 
         self.textures = glGenTextures(units_x * units_y)
 
+        self.format = format
+        self.type = type
+
         if not isinstance(self.textures, np.ndarray):
             self.textures = [self.textures]
 
-        init_image = np.zeros(self.unit_width * self.unit_height * 3)
+        init_image = np.zeros(self.unit_width * self.unit_height * 16, dtype=np.uint8)
 
         for i in xrange(units_x * units_y):
             glEnable(GL_TEXTURE_2D)
             glBindTexture(GL_TEXTURE_2D, self.textures[i])
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, self.unit_width,
-                            self.unit_height, 0, GL_RGB, GL_BYTE, init_image)
+            glTexImage2D(GL_TEXTURE_2D, 0, format, self.unit_width,
+                         self.unit_height, 0, format, type, init_image)
 
     def get_width(self):
         return self.units_x * self.unit_width
@@ -82,7 +86,7 @@ class MultiTexture():
     def __del__(self):
         glDeleteTextures(self.textures)
 
-    def insert(self, y, line):
+    def insert(self, y, line, format=GL_RGBA, type=GL_UNSIGNED_INT_8_8_8_8):
         if y > self.units_y * self.unit_height:
             raise Error("out of bounds")
 
@@ -91,8 +95,7 @@ class MultiTexture():
 
         for x in xrange(self.units_x):
             glBindTexture(GL_TEXTURE_2D, self.textures[base + x])
-            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, offset_y, self.unit_width, 1,
-                            GL_RGBA, GL_UNSIGNED_INT_8_8_8_8,
+            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, offset_y, self.unit_width, 1, format, type,
                             line[x * self.unit_width:(x + 1) * self.unit_width])
 
     def draw(self):

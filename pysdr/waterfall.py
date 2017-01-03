@@ -10,6 +10,7 @@ import signal
 import time
 
 from OpenGL.GL import *
+from OpenGL.GL import shaders
 from OpenGL.GLUT import *
 from OpenGL.GLU import *
 
@@ -115,8 +116,8 @@ class Texture():
 
         glBindTexture(GL_TEXTURE_2D, self.texture)
 
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
 
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image.shape[1], image.shape[0], 0,
                         GL_RGBA, GL_UNSIGNED_INT_8_8_8_8, image)
@@ -247,6 +248,74 @@ class RangeSelector():
         else:
             return False
 
+class ColorMappingShader:
+    VERT_SHADER_CODE = """
+        #version 130
+        void main() {
+            gl_TexCoord[0] = gl_MultiTexCoord0;
+            gl_Position = ftransform();
+        }
+    """
+
+    FRAG_SHADER_CODE = """
+        #version 130
+        uniform float scale;
+        uniform float shift;
+        uniform sampler2D sampler;
+
+        float mag2col_base2_blue(float val)
+        {
+            if (val <= -2.75)
+                return 0.0;
+
+            if (val <= -1.75)
+                return val + 2.75;
+
+            if (val <= -0.75)
+                return -(val + 0.75);
+
+            if (val <= 0.0)
+                return 0.0;
+
+            if (val >= 1.0)
+                return 1.0;
+
+            return val;
+        }
+
+        vec3 mag2col(float a) {
+            return vec3(clamp(a + 1.0, 0.0, 1.0), clamp(a, 0.0, 1.0),
+                        mag2col_base2_blue(a - 1.0));
+        }
+
+        void main() {
+            gl_FragColor = vec4(mag2col((texture(sampler, gl_TexCoord[0].xy).x + shift) * scale), 1);
+        }
+    """
+
+    M2C_RANGE = (-1.75, 2.)
+    TEX_RANGE = (-100., 60.)
+
+    def setup(self, mag_range):
+        scale = (self.TEX_RANGE[1] - self.TEX_RANGE[0]) / (mag_range[1] - mag_range[0]) * (self.M2C_RANGE[1] - self.M2C_RANGE[0])
+        shift = (self.TEX_RANGE[0] - mag_range[0]) / (self.TEX_RANGE[1] - self.TEX_RANGE[0]) + self.M2C_RANGE[0] / scale
+
+        shaders.glUseProgram(self.program)
+
+        glUniform1i(glGetUniformLocation(self.program, "sampler"), 0)
+        glUniform1f(glGetUniformLocation(self.program, "scale"), scale)
+        glUniform1f(glGetUniformLocation(self.program, "shift"), shift)
+        glActiveTexture(GL_TEXTURE0)
+
+    def texture_insert_prep(self, line):
+        return (line - self.TEX_RANGE[0]) / (self.TEX_RANGE[1] - self.TEX_RANGE[0])
+
+    def __init__(self):
+        vert_shader = shaders.compileShader(self.VERT_SHADER_CODE, GL_VERTEX_SHADER)
+        frag_shader = shaders.compileShader(self.FRAG_SHADER_CODE, GL_FRAGMENT_SHADER)
+        self.program = shaders.compileProgram(vert_shader, frag_shader)
+
+
 class WaterfallWindow(Viewer):
     def __init__(self, sig_input, bins, overlap=0, start_time=None):
         if bins % 1024 != 0:
@@ -262,7 +331,8 @@ class WaterfallWindow(Viewer):
         self.window = 0.5 * (1.0 - np.cos((2 * math.pi * np.arange(self.bins)) / self.bins))
         self.overlap = overlap
         self.row_duration = float(bins - overlap) / sig_input.sample_rate
-        self.multitexture = MultiTexture(1024, 1024, self.bins / 1024, 1)
+        # TODO: can we be sure the texture will be stored as floats internally?
+        self.multitexture = MultiTexture(1024, 1024, self.bins / 1024, 1, format=GL_RED, type=GL_FLOAT)
 
         self.start_time = time.time() if start_time is None else start_time
 
@@ -284,6 +354,8 @@ class WaterfallWindow(Viewer):
         self.process_thread = threading.Thread(target=self.process)
         self.process_thread.setDaemon(True)
 
+        self.shader = ColorMappingShader()
+
     def start(self):
         self.sig_input.start()
         self.process_thread.start()
@@ -297,7 +369,10 @@ class WaterfallWindow(Viewer):
         glPushMatrix()
         glTranslated(-1.0, 0.0, 0.0)
         glScalef(2.0, 1.0, 1.0)
+
+        self.shader.setup(self.mag_range)
         self.multitexture.draw_scroll(self.texture_edge)
+        shaders.glUseProgram(0)
         glPopMatrix()
 
     def freq_to_bin(self, freq):
@@ -316,7 +391,7 @@ class WaterfallWindow(Viewer):
         try:
             while True:
                 rec = self.texture_inserts.get(block=True, timeout=0.01)
-                self.multitexture.insert(self.texture_edge, rec)
+                self.multitexture.insert(self.texture_edge, rec, format=GL_RED, type=GL_FLOAT)
                 self.texture_row = self.texture_row + 1
                 self.texture_edge = self.texture_row % self.multitexture.get_height()
 
@@ -348,14 +423,15 @@ class WaterfallWindow(Viewer):
             spectrum = np.log10(spectrum) * 10
             self.call_layers('on_log_spectrum', (spectrum,))
 
-            try:
-                scale = 3.75 / (self.mag_range[1] - self.mag_range[0])
-            except ZeroDivisionError:
-                scale = 3.75 / 0.00001
+            #try:
+            #    scale = 3.75 / (self.mag_range[1] - self.mag_range[0])
+            #except ZeroDivisionError:
+            #    scale = 3.75 / 0.00001
 
-            shift = -self.mag_range[0] * scale - 1.75
+            #shift = -self.mag_range[0] * scale - 1.75
 
-            line = ext.mag2col((spectrum * scale + shift).astype('f'))
+            #line = ext.mag2col((spectrum * scale + shift).astype('f'))
+            line = self.shader.texture_insert_prep(spectrum).astype('f')
             self.process_row = self.process_row + 1
             self.texture_inserts.put(line)
 
@@ -420,9 +496,13 @@ def main():
                                 (by default, with name \'pysdr\')')
     parser.add_argument('-r', '--raw', metavar='RATE', type=int,
                         help='feed signal from the standard input, expects 2 channel \
-                                interleaved floats with the given samplerate')
-    parser.add_argument('-d', '--detector', metavar='FILENAME', action='append',
-                        help='attach the given detector script')
+                                interleaved floats with the given sample-rate')
+    parser.add_argument('-d', '--detector', metavar='ARGS', action='append',
+                        help='attach the given detector script, \
+                                expects to be given the script filename \
+                                followed by arguments for the script, \
+                                all joined by spaces and passed on the command-line \
+                                as one quoted argument')
     parser.add_argument('-p', '--persfn', metavar='FILENAME',
                         help='a file in which to preserve the visualization parameters \
                                 that come from interactive manipulation, \
@@ -451,7 +531,7 @@ def main():
     if args.detector:
         detector_em = EventMarker(viewer)
         viewer.layers.append(detector_em)
-        viewer.layers += [DetectorScript(viewer, [detector_em], fn) for fn in args.detector]
+        viewer.layers += [DetectorScript(viewer, [detector_em], a.split()) for a in args.detector]
 
     if isinstance(sig_input, JackInput):
         midi_em = EventMarker(viewer)
