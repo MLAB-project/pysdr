@@ -487,7 +487,8 @@ def main():
     parser.add_argument('-b', '--bins', type=int, default=4096,
                         help='number of FFT bins (default: %(default)s)')
     parser.add_argument('-H', '--height', type=float, default=0,
-                        help='minimal height of the waterfall in seconds (default 1024 FFT rows)')
+                        help='minimal height of the waterfall in seconds \
+                                (default corresponds to 1024 windows)')
     parser.add_argument('-o', '--overlap', type=float, default=0.75,
                         help='overlap between consecutive windows as a proportion \
                                 of the number of bins (default: %(default)s)')
@@ -508,7 +509,7 @@ def main():
                                 that come from interactive manipulation, \
                                 i.e. the visible area of the waterfall \
                                 and the selected magnitude range \
-                                (saving is triggered by the key \'p\')')
+                                (save triggered by pressing \'p\')')
 
     args = parser.parse_args()
 

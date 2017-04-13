@@ -1,8 +1,5 @@
 #!/usr/bin/python
 
-# Experimental record viewer, recalculates the waterfall
-# with different number of bins according to its visual stretching.
-
 import numpy as np
 import Queue as queue
 import threading
@@ -162,7 +159,7 @@ def read_file(filename):
 
 def main():
     if len(sys.argv) != 2:
-        sys.stderr.write("usage: recordviewer.py FILENAME\n")
+        sys.stderr.write("usage: pysdr-recviewer FILENAME\n")
         exit(1)
 
     sample_rate, signal = read_file(sys.argv[1])

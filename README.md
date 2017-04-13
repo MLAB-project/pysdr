@@ -1,16 +1,12 @@
 # PySDR
 
-SDR utilities written in Python
+PySDR displays spectral waterfall, a visualization of signal's frequency spectrum over time. It is developed for SDR-related applications, but can be fed any equidistantly-sampled complex-valued signal for which it makes sense.
 
-![UST logo](http://www.ust.cz/include/Logo_UST.png "UST")
-
-## Waterfall
-
-Plots live spectral waterfall of a quadrature signal which can be taken either from the JACK audio system or the standard input. The graphical work is offloaded to GPU via OpenGL.
+A live waterfall is launched by `pysdr-waterfall`. It connects to the JACK audio system and takes its input from there, or, if the flag `-r` is passed, it expects its input on the standard input in the form of an endless stream of 32-bit interleaved floats.
 
 	$ pysdr-waterfall -h
 	usage: pysdr-waterfall [-h] [-b BINS] [-H HEIGHT] [-o OVERLAP] [-j NAME]
-	                       [-r RATE] [-d FILENAME] [-p CONFIG_FILE]
+	                       [-r RATE] [-d ARGS] [-p FILENAME]
 	
 	Plot live spectral waterfall of a quadrature signal.
 	
@@ -18,26 +14,41 @@ Plots live spectral waterfall of a quadrature signal which can be taken either f
 	  -h, --help            show this help message and exit
 	  -b BINS, --bins BINS  number of FFT bins (default: 4096)
 	  -H HEIGHT, --height HEIGHT
-	                        minimal height of the waterfall in seconds (default
-	                        1024 FFT rows)
+	                        minimal height of the waterfall in seconds
+	                        (default corresponds to 1024 windows)
 	  -o OVERLAP, --overlap OVERLAP
-	                        overlap between consecutive windows as a proportion of
-	                        the number of bins (default: 0.75)
-	  -j NAME, --jack NAME  feed signal from JACK and use the given client name
-	                        (by default, with name 'pysdr')
-	  -r RATE, --raw RATE   feed signal from the standard input, 2 channel
-	                        interleaved floats with the given samplerate
-	  -d FILENAME, --detector FILENAME
-	                        attach the given detector script
-      -p CONFIG_FILE,       configuration file to which the waterfall display configuration is saved. 
-                            Configuration stored in file is updated by pressing of "p" key. 
+	                        overlap between consecutive windows as a
+	                        proportion of the number of bins (default: 0.75)
+	  -j NAME, --jack NAME  feed signal from JACK and use the given client
+	                        name (by default, with name 'pysdr')
+	  -r RATE, --raw RATE   feed signal from the standard input, expects 2
+	                        channel interleaved floats with the given sample-
+	                        rate
+	  -d ARGS, --detector ARGS
+	                        attach the given detector script, expects to be
+	                        given the script filename followed by arguments
+	                        for the script, all joined by spaces and passed on
+	                        the command-line as one quoted argument
+	  -p FILENAME, --persfn FILENAME
+	                        a file in which to preserve the visualization
+	                        parameters that come from interactive
+	                        manipulation, i.e. the visible area of the
+	                        waterfall and the selected magnitude range (save
+	                        triggered by pressing 'p')
+
+![stretching](https://cloud.githubusercontent.com/assets/382160/24999343/6fe18d4e-203d-11e7-9c5e-1949dc2f508b.gif)
+
+### Example usage with sox (cross-platform)
+
+	$ sox -d -e floating-point -b 32 -r 48000 -t raw --buffer 1024 - | ./pysdr-waterfall -r 48000
+
 ### Example usage with ALSA
 
 	$ arecord -f FLOAT_LE -c 2 -r 44100 --buffer-size 1024 | pysdr-waterfall -r 44100
 
 ## Record Viewer
 
-Shows spectral waterfall of short raw recordings stored in WAV files or FITS files produced by [Radio Observer](https://github.com/MLAB-project/radio-observer). Recalculates the waterfall with different number of bins according to its visual stretching.
+There's also `pysdr-reciewer`, which displays spectral waterfall of short recordings. The recordings are expected to be either WAV files, or FITS files in the format produced by [Radio Observer](https://github.com/MLAB-project/radio-observer). The number of frequency bins reflects the aspect ratio of the waterfall, and so is interactive.
 
 ### Usage
 
@@ -49,7 +60,11 @@ Shows spectral waterfall of short raw recordings stored in WAV files or FITS fil
 
     $ sudo apt-get install python-numpy python-opengl python-dev libjack-jackd2-dev
 
-## Inplace build
+## In-place build
+
+The package has a binary component which has to be built on the target machine. (It is not needed for `pysdr-waterfall` at the moment.)
+
+For usage without installation, do an in-place build first.
 
 	$ python setup.py build_ext --inplace
 
@@ -61,7 +76,7 @@ Shows spectral waterfall of short raw recordings stored in WAV files or FITS fil
 
 ### Radio Meteor Detection Station
 
-PySDR is developed to be used, among others, with the Radio Meteor Detection Station designs.
+PySDR is developed to be used, among others, with the RMDS designs by the MLAB project.
 
 [Technical description](http://wiki.mlab.cz/doku.php?id=en:rmds)
 
