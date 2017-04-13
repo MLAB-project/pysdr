@@ -250,7 +250,7 @@ class RangeSelector():
 
 class ColorMappingShader:
     VERT_SHADER_CODE = """
-        #version 130
+        #version 120
         void main() {
             gl_TexCoord[0] = gl_MultiTexCoord0;
             gl_Position = ftransform();
@@ -258,7 +258,7 @@ class ColorMappingShader:
     """
 
     FRAG_SHADER_CODE = """
-        #version 130
+        #version 120
         uniform float scale;
         uniform float shift;
         uniform sampler2D sampler;
@@ -289,7 +289,7 @@ class ColorMappingShader:
         }
 
         void main() {
-            gl_FragColor = vec4(mag2col((texture(sampler, gl_TexCoord[0].xy).x + shift) * scale), 1);
+            gl_FragColor = vec4(mag2col((texture2D(sampler, gl_TexCoord[0].xy).x + shift) * scale), 1);
         }
     """
 
