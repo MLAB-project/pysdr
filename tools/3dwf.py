@@ -583,7 +583,7 @@ def main():
     wf.shift = 0
 
     filt = interp_fir_filter(lowpass(np.pi / 4, 512) * np.hamming(512), 4)
-    freqx = freq_translator((3.0/8.0) * np.pi)
+    freqx = freq_translator((0.8/8.0) * np.pi)
 
     headlen = max(filt.nhistory, overlap)
     ringbuf = RingBuf(headlen, np.zeros(headlen + (nbins - overlap) * 512, dtype=np.complex64))
