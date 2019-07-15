@@ -60,14 +60,20 @@ class RecordViewer(Viewer):
                                                           cutoff=(-1.0, 1.0)),
                                         static_axis(UNIT_SEC, -duration, offset=duration)))
 
+        self.range_selector = RangeSelector(self)
+        self.layers.append(self.range_selector)
+
         glutIdleFunc(self.cb_idle)
         self.signal = signal
-        self.bins = None
+        self.bins_ = None
         self.texture = None
         self.new_data_event = threading.Event()
         self.new_data = None
         self.worker = AsyncWorker()
         self.update_texture()
+
+        self.bins = 1
+        self.mag_range = (0, 0)
 
     def init(self):
         glLineWidth(1.0)
@@ -75,21 +81,23 @@ class RecordViewer(Viewer):
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
     def update_texture(self):
-        bins = int(int(np.sqrt(len(self.signal) / self.view.scale_y * self.view.scale_x)) / 16) * 16
-        bins = min(max(bins, 16), glGetIntegerv(GL_MAX_TEXTURE_SIZE))
+        bins_ = int(int(np.sqrt(len(self.signal) / self.view.scale_y * self.view.scale_x)) / 16) * 16
+        bins_ = min(max(bins_, 16), glGetIntegerv(GL_MAX_TEXTURE_SIZE))
 
-        if bins == self.bins:
+        if bins_ == self.bins_:
             return
 
-        def texture_work(self, bins):
-            waterfall = waterfallize(self.signal, bins)
+        def texture_work(self, bins_):
+            waterfall = waterfallize(self.signal, bins_)
+            self.range_selector.on_log_spectrum(waterfall)
+            self.bins = waterfall.size
             waterfall[np.isneginf(waterfall)] = np.nan
             wmin, wmax = np.nanmin(waterfall), np.nanmax(waterfall)
             waterfall = ((waterfall - wmin) / (wmax - wmin)) * 5.5 - 4.5
             self.new_data = ext.mag2col(waterfall.astype('f'))
             self.new_data_event.set()
 
-        self.worker.set_work(texture_work, (self, bins))
+        self.worker.set_work(texture_work, (self, bins_))
 
     def on_mouse_button(self, button, state, x, y):
         if state == GLUT_UP and button == GLUT_RIGHT_BUTTON:

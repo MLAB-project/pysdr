@@ -93,10 +93,14 @@ class PlotAxes:
 
     def draw_text_ss(self, x, y, text):
         x, y = self.viewer.view.screen_offset[0] + x, self.viewer.view.screen_offset[1] + y
+
+        glPushMatrix()
+        glTranslatef(int(x), int(y), 0)
+        self.viewer.draw_text(text)
+        glPopMatrix()
         #glWindowPos2i(int(x), int(y))
         #for c in text:
-        #   glutBitmapCharacter(GLUT_BITMAP_8_BY_13, ord(c))
-        self.viewer.draw_string(x, y, text)
+        #    glutBitmapCharacter(GLUT_BITMAP_8_BY_13, ord(c))
 
     def draw_text(self, x, y, text):
         glPushMatrix()
@@ -127,7 +131,12 @@ class PlotAxes:
                     glVertex2f(*m(pos, ob))
             glEnd()
 
+            glPushMatrix()
+            glLoadIdentity()
+
             glColor4f(1.0, 1.0, 1.0, 1.0)
             for pos, label in ticks:
                 x, y = m(view.to_screen(pos, pos)[axis] + 5, 5)
                 self.draw_text_ss(x, y, label)
+
+            glPopMatrix()

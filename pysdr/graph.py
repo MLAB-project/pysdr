@@ -58,20 +58,22 @@ class MultiTexture():
         self.units_x = units_x
         self.units_y = units_y
 
-        self.textures = glGenTextures(units_x * units_y)
+    def gl_init(self):
+        self.textures = glGenTextures(self.units_x * self.units_y)
 
         if not isinstance(self.textures, np.ndarray):
             self.textures = [self.textures]
 
         init_image = np.zeros(self.unit_width * self.unit_height * 3)
 
-        for i in xrange(units_x * units_y):
+        for i in xrange(self.units_x * self.units_y):
             glEnable(GL_TEXTURE_2D)
             glBindTexture(GL_TEXTURE_2D, self.textures[i])
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, self.unit_width,
                             self.unit_height, 0, GL_RGB, GL_BYTE, init_image)
+
 
     def get_width(self):
         return self.units_x * self.unit_width

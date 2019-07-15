@@ -1,0 +1,24 @@
+# The Interface
+
+Coordinates are in OpenGL-space. y increases upwards.
+
+Functions always called with the OpenGL context active:
+
+   gl_init()
+       will be called once before the other GL-related functions.
+
+   gl_reshape(w, h)
+       notifies about a change in the window size.
+
+   gl_draw()
+       should redraw the contents, a call can be requested by req_update.
+       gl_reshape will be called at least once before the first gl_draw call.
+
+Functions which should not assume active OpenGL context:
+
+   key_press(key)
+
+   mouse_btn(left, pressed, x, y)
+
+   mouse_motion(x, y)
+

@@ -8,8 +8,9 @@ import numpy as np
 import argparse
 
 from OpenGL.GL import *
-from OpenGL.GLUT import *
 from OpenGL.GLU import *
+
+from OpenGL.GLUT import GLUT_LEFT_BUTTON, GLUT_RIGHT_BUTTON, GLUT_UP, GLUT_DOWN
 
 from pysdr.graph import MultiTexture, PlotLine
 from pysdr.input import RawSigInput, JackInput
@@ -21,32 +22,19 @@ import pysdr.ext as ext
 
 
 class Viewer:
-    def __init__(self, window_name, skip_glut=False,
-                 swap_buffers=None, post_redisplay=None):
-
-        if not skip_glut:
-            glutCreateWindow(window_name)
-            glutDisplayFunc(self.cb_display)
-            glutMouseFunc(self.cb_mouse)
-            glutMotionFunc(self.cb_motion)
-            glutReshapeFunc(self.cb_reshape)
-            glutKeyboardFunc(self.cb_keyboard)
-
-        self.swap_buffers = swap_buffers or glutSwapBuffers
-        self.post_redisplay = post_redisplay or glutPostRedisplay
-
-        self.init()
+    def __init__(self):
         self.view = View()
         self.buttons_pressed = []
 
         self.layers = [self, self.view]
 
     def draw_string(self, x, y, string):
-        glWindowPos2i(x, y)
+        return
+        glWindowPos2i(int(x), int(y))
         for c in string:
             glutBitmapCharacter(GLUT_BITMAP_8_BY_13, ord(c))
 
-    def init(self):
+    def gl_init(self):
         pass
 
     def call_layers(self, method, args=()):
@@ -60,7 +48,7 @@ class Viewer:
                 if getattr(layer, method)(*args):
                     break
 
-    def cb_display(self):
+    def gl_draw(self):
         glClear(GL_COLOR_BUFFER_BIT)
         glClearColor(0, 0, 0, 1)
         glLoadIdentity()
@@ -72,32 +60,27 @@ class Viewer:
 
         self.call_layers('draw_screen')
 
-        self.swap_buffers()
+    def mouse_btn(self, left, down, x, y):
+        print left, down, x, y
 
-    def cb_mouse(self, button, state, x, y):
-        if state == GLUT_DOWN:
-            self.buttons_pressed.append(button)
-
-        if state == GLUT_UP:
+        if down:
+            self.buttons_pressed.append(left)
+        else:
             try:
-                self.buttons_pressed.remove(button)
+                self.buttons_pressed.remove(left)
             except ValueError:
                 pass
 
-        self.call_layers_handler('on_mouse_button', (button, state, x,
-                                                     self.screen_size[1] - y))
+        self.call_layers_handler('on_mouse_button', (GLUT_LEFT_BUTTON if left else GLUT_RIGHT_BUTTON,
+                                                     GLUT_DOWN if down else GLUT_UP, x, y))
 
-        self.post_redisplay()
-
-    def cb_motion(self, x, y):
+    def mouse_motion(self, x, y):
         if len(self.buttons_pressed) == 0:
             return
 
-        self.call_layers_handler('on_drag', (x, self.screen_size[1] - y))
+        self.call_layers_handler('on_drag', (x, y))
 
-        self.post_redisplay()
-
-    def cb_reshape(self, w, h):
+    def gl_reshape(self, w, h):
         print w, h
         glViewport(0, 0, w, h)
         glMatrixMode(GL_PROJECTION)
@@ -109,9 +92,8 @@ class Viewer:
 
         self.call_layers('on_resize', (w, h))
 
-    def cb_keyboard(self, key, x, y):
+    def key_press(self, key):
         self.call_layers_handler('on_key_press', (key))
-        self.post_redisplay()
 
     def get_layer(self, type):
         a = [a for a in self.layers if a.__class__ == type]
@@ -262,10 +244,7 @@ class WaterfallWindow(Viewer):
         if bins % 1024 != 0:
             raise NotImplementedError("number of bins must be a multiple of 1024")
 
-        Viewer.__init__(self, "PySDR", **kwargs)
-
-        if not kwargs.get('skip_glut', False):
-            glutIdleFunc(self.cb_idle)
+        Viewer.__init__(self)
 
         self.mag_range = (-45, 5)
 
@@ -298,12 +277,24 @@ class WaterfallWindow(Viewer):
         self.sig_input.start()
         self.process_thread.start()
 
-    def init(self):
+    def gl_init(self):
+        Viewer.gl_init(self)
+        self.multitexture.gl_init()
         glLineWidth(1.0)
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
     def draw_content(self):
+        while True:
+            try:
+                rec = self.texture_inserts.get(block=False)
+                self.multitexture.insert(self.texture_edge, rec)
+                self.texture_row = self.texture_row + 1
+                self.texture_edge = self.texture_row % self.multitexture.get_height()
+                self.call_layers('on_texture_insert')
+            except Queue.Empty:
+                break
+
         glPushMatrix()
         glTranslated(-1.0, 0.0, 0.0)
         glScalef(2.0, 1.0, 1.0)
@@ -322,27 +313,8 @@ class WaterfallWindow(Viewer):
     def row_to_y(self, row):
         return float(row - self.texture_row) / self.multitexture.get_height() + 1.0
 
-    def cb_idle(self, call_post_redisplay=True, no_timeout=False):
-        new = False
-
-        try:
-            while True:
-                if no_timeout:
-                    rec = self.texture_inserts.get(block=False)
-                else:
-                    rec = self.texture_inserts.get(block=True, timeout=0.01)
-                self.multitexture.insert(self.texture_edge, rec)
-                self.texture_row = self.texture_row + 1
-                self.texture_edge = self.texture_row % self.multitexture.get_height()
-
-                self.call_layers('on_texture_insert')
-
-                new = True
-
-                if call_post_redisplay:
-                    self.post_redisplay()
-        except Queue.Empty:
-            return new
+    def req_update(self):
+        pass
 
     def process(self):
         ringbuf = np.zeros(self.bins * 4, dtype=np.complex64)
@@ -376,6 +348,7 @@ class WaterfallWindow(Viewer):
             line = ext.mag2col((spectrum * scale + shift).astype('f'))
             self.process_row = self.process_row + 1
             self.texture_inserts.put(line)
+            self.req_update()
 
 class Label:
     @staticmethod
@@ -403,7 +376,149 @@ class Label:
                      Console.CHAR_HEIGHT, padding=3)
 
         glColor4f(1.0, 1.0, 1.0, 0.75)
-        Console.draw_string(x, y, self.content)
+        glPushMatrix()
+        glTranslatef(x, y, 0)
+        self.viewer.draw_text(self.content)
+        glPopMatrix()
+        #Console.draw_string(x, y, self.content)
+
+
+#def glut_loop(what_to_loop_on):
+#    from OpenGL.GLUT import *
+#    glutInit()
+#    glutInitWindowSize(640, 480)
+#    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA)
+#
+#    glutCreateWindow(window_name)
+#
+#    def display_func():
+#        what_to_loop_on.gl_draw()
+#        glutSwapBuffers()
+#
+#    glutDisplayFunc(display_func)
+#
+#    def mouse_func(button, state, x, y):
+#        what_to_loop_on.mouse_btn(button == GLUT_LEFT_BUTTON,
+#                                  state == GLUT_DOWN,
+#                                  x, y)
+#        glutPostRedisplay()
+#
+#    glutMouseFunc(mouse_func)
+#
+#    def motion_func(x, y):
+#        what_to_loop_on.motion_func(x, y)
+#        glutPostRedisplay()
+#
+#    glutMotionFunc(motion_func)
+#
+#    glutReshapeFunc(what_to_loop_on.gl_reshape)
+#    glutKeyboardFunc(lambda key, x, y: what_to_loop_on.key_press)
+#
+#    what_to_loop_on.gl_init()
+#
+#    glutMainLoop()
+
+
+import sdl2
+import sdl2.ext
+
+pybuf_from_memory = ctypes.pythonapi.PyBuffer_FromReadWriteMemory
+pybuf_from_memory.restype = ctypes.py_object
+
+FONT_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"
+
+font_manager = sdl2.ext.FontManager(FONT_PATH, size=12)
+text_cache = dict()
+
+def render_text(text):
+    if text not in text_cache:
+        surface = font_manager.render(text)
+
+        texture = glGenTextures(1)
+
+        a = np.zeros((surface.h, surface.w), dtype=np.uint32)
+        a[:,:] = sdl2.ext.pixels2d(surface).transpose()
+
+        glEnable(GL_TEXTURE_2D)
+        glBindTexture(GL_TEXTURE_2D, texture)
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, surface.w, surface.h, 0,
+                     GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, a)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR) # TODO: gl prefix?
+        glDisable(GL_TEXTURE_2D)
+        text_cache[text] = {'surf': surface, 'text': texture}
+
+    surf = text_cache[text]['surf']
+    texture = text_cache[text]['text']
+
+    glColor4f(1.0, 1.0, 1.0, 1.0)
+    glEnable(GL_TEXTURE_2D)
+    glBindTexture(GL_TEXTURE_2D, texture)
+
+    glBegin(GL_QUADS)
+    glTexCoord2i(0, 1)
+    glVertex2i(0, 0)
+    glTexCoord2i(0, 0)
+    glVertex2i(0, surf.h)
+    glTexCoord2i(1, 0)
+    glVertex2i(surf.w, surf.h)
+    glTexCoord2i(1, 1)
+    glVertex2i(surf.w, 0)
+    glEnd()
+
+    glDisable(GL_TEXTURE_2D)
+
+def sdl2_window_loop(w, h, name, cont):
+    UPDATE_REQ_EVENT = sdl2.SDL_RegisterEvents(1)
+
+    def req_update():
+        event = sdl2.SDL_Event()
+        event.type = UPDATE_REQ_EVENT
+        sdl2.SDL_PushEvent(ctypes.byref(event))
+
+    sdl2.SDL_Init(sdl2.SDL_INIT_VIDEO)
+
+    window = sdl2.SDL_CreateWindow(name,
+                                   sdl2.SDL_WINDOWPOS_CENTERED,
+                                   sdl2.SDL_WINDOWPOS_CENTERED, w, h,
+                                   sdl2.SDL_WINDOW_RESIZABLE | sdl2.SDL_WINDOW_OPENGL)
+    context = sdl2.SDL_GL_CreateContext(window)
+
+    cont.draw_text = render_text
+    cont.req_update = req_update
+
+    cont.gl_init()
+    cont.gl_reshape(w, h)
+
+    event = sdl2.SDL_Event()
+    while True:
+        sdl2.SDL_WaitEvent(ctypes.byref(event))
+
+        while True:
+            if event.type == sdl2.SDL_QUIT:
+                return
+
+            if event.type in (sdl2.SDL_MOUSEBUTTONDOWN, sdl2.SDL_MOUSEBUTTONUP, sdl2.SDL_MOUSEMOTION):
+                event.motion.y = h - event.motion.y
+
+            if event.type in (sdl2.SDL_MOUSEBUTTONDOWN, sdl2.SDL_MOUSEBUTTONUP):
+                cont.mouse_btn((event.motion.state & sdl2.SDL_BUTTON_LEFT),
+                               event.type == sdl2.SDL_MOUSEBUTTONDOWN,
+                               event.motion.x, event.motion.y)
+    
+            if event.type == sdl2.SDL_MOUSEMOTION:
+                cont.mouse_motion(event.motion.x, event.motion.y)
+    
+            if event.type == sdl2.SDL_WINDOWEVENT and event.window.event == sdl2.SDL_WINDOWEVENT_RESIZED:
+                w, h = event.window.data1, event.window.data2
+                cont.gl_reshape(w, h)
+
+            if sdl2.SDL_PollEvent(ctypes.byref(event)) == 0:
+                break
+
+        cont.gl_draw()
+        sdl2.SDL_GL_SwapWindow(window)
+
 
 def main():
     parser = argparse.ArgumentParser(description='Plot live spectral waterfall of a quadrature signal.')
@@ -435,10 +550,6 @@ def main():
     else:
         sig_input = JackInput(args.jack)
 
-    glutInit()
-    glutInitWindowSize(640, 480)
-    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA)
-
     viewer = WaterfallWindow(sig_input, args.bins, overlap=overlap_bins)
 
     if args.detector:
@@ -455,7 +566,7 @@ def main():
 
     viewer.start()
 
-    glutMainLoop()
+    sdl2_window_loop(640, 480, "pysdr pysdr pysdr", viewer)
 
 if __name__ == "__main__":
     main()
