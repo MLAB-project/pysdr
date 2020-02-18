@@ -56,9 +56,9 @@ There's also `pysdr-reciewer`, which displays spectral waterfall of short record
 
 ## Dependencies
 
-### Ubuntu 13.10
+### Ubuntu
 
-    $ sudo apt-get install python-numpy python-opengl python-dev libjack-jackd2-dev
+    $ sudo apt-get install python-numpy python-opengl python-dev libjack-jackd2-dev python-pil
 
 ## In-place build
 
