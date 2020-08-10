@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 import numpy as np
-import Queue as queue
+import queue as queue
 import threading
 import scipy.io.wavfile
 import sys

@@ -2,7 +2,7 @@
 
 import math
 import sys
-import Queue
+import queue
 import threading
 import numpy as np
 import argparse
