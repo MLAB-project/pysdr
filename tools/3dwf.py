@@ -16,7 +16,10 @@ import sdl2
 import sdl2.ext
 
 import OpenGL.GL as gl
-import Queue as queue
+try: 
+    import queue
+except ImportError:
+    import Queue as queue
 
 from OpenGL.GL import *
 from OpenGL.GL import shaders
