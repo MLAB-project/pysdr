@@ -33,7 +33,7 @@ if np.float32 not in GLOBAL_REGISTRY:
     from OpenGL.arrays.numpymodule import NumpyHandler
     NumpyHandler().register(np.float32)
 
-pybuf_from_memory = ctypes.pythonapi.PyBuffer_FromReadWriteMemory
+pybuf_from_memory = ctypes.pythonapi.PyMemoryView_FromMemory
 pybuf_from_memory.restype = ctypes.py_object
 
 
@@ -478,7 +478,7 @@ class WFViewer:
 class interp_fir_filter:
     def __init__(self, taps, interp):
         self.interp = interp
-        self.nhistory = (len(taps) - 1) / interp
+        self.nhistory = (len(taps) - 1) // interp
         padlen = (self.nhistory + 1) * interp - len(taps)
         self.taps = np.concatenate((np.zeros(padlen, dtype=taps.dtype), taps))
 
@@ -545,15 +545,15 @@ def input_thread(readfunc, ringbuf, nbins, overlap, viewer):
     window = 0.5 * (1.0 - np.cos((2 * math.pi * np.arange(nbins)) / nbins))
 
     #ringbuf.append(np.fromfile(fil, count=ringbuf.headlen, dtype=np.complex64))
-    ringbuf.append(np.fromstring(readfunc(ringbuf.headlen * 8), dtype=np.complex64))
+    ringbuf.append(np.frombuffer(readfunc(ringbuf.headlen * 8), dtype=np.complex64))
 
     while True:
         #ringbuf.append(np.fromfile(fil, count=nbins - overlap, dtype=np.complex64))
-        ringbuf.append(np.fromstring(readfunc((nbins - overlap) * 8), dtype=np.complex64))
+        ringbuf.append(np.frombuffer(readfunc((nbins - overlap) * 8), dtype=np.complex64))
 
         frame = ringbuf.slice(ringbuf.fill_edge - nbins, ringbuf.fill_edge)
         spectrum = np.absolute(np.fft.fft(np.multiply(frame, window)))
-        spectrum = np.concatenate((spectrum[nbins/2:nbins], spectrum[0:nbins/2]))
+        spectrum = np.concatenate((spectrum[nbins//2:nbins], spectrum[0:nbins//2]))
         spectrum = np.log10(spectrum) * 10
         viewer.inserts.put(spectrum / 20.0)
 
@@ -594,11 +594,11 @@ def main():
 
     def callback(unused, buf, buflen):
         global audio_edge
-        bufbuf = pybuf_from_memory(buf, buflen)
+        bufbuf = pybuf_from_memory(buf, buflen, 0x200) # PyBUF_WRITE
         array = np.frombuffer(bufbuf, np.float32)
 
         assert len(array) % filt.interp == 0 # TODO
-        nreqframes = len(array) / filt.interp
+        nreqframes = len(array) // filt.interp
 
         loc_ringbuf_edge = ringbuf.fill_edge
         if loc_ringbuf_edge < 0 or (loc_ringbuf_edge - audio_edge) % len(ringbuf) < nreqframes:
@@ -676,7 +676,7 @@ def main():
 
     try:
         for exc in iter(err_queue.get_nowait, None):
-            sdl2.SDL_ShowSimpleMessageBox(sdl2.SDL_MESSAGEBOX_ERROR, "Exception", str(exc), None)
+            sdl2.SDL_ShowSimpleMessageBox(sdl2.SDL_MESSAGEBOX_ERROR, b"Exception", str(exc).encode("ascii"), None)
     except queue.Empty:
         pass
 
