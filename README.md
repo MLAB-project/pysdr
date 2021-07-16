@@ -2,6 +2,8 @@
 
 PySDR displays spectral waterfall, a visualization of signal's frequency spectrum over time. It is developed for SDR-related applications, but can be fed any equidistantly-sampled complex-valued signal for which it makes sense.
 
+![stretching](https://cloud.githubusercontent.com/assets/382160/24999343/6fe18d4e-203d-11e7-9c5e-1949dc2f508b.gif)
+
 A live waterfall is launched by `pysdr-waterfall`. It connects to the JACK audio system and takes its input from there, or, if the flag `-r` is passed, it expects its input on the standard input in the form of an endless stream of 32-bit interleaved floats.
 
 	$ pysdr-waterfall -h
@@ -36,7 +38,6 @@ A live waterfall is launched by `pysdr-waterfall`. It connects to the JACK audio
 	                        waterfall and the selected magnitude range (save
 	                        triggered by pressing 'p')
 
-![stretching](https://cloud.githubusercontent.com/assets/382160/24999343/6fe18d4e-203d-11e7-9c5e-1949dc2f508b.gif)
 
 ### Example usage with sox (cross-platform)
 
