@@ -81,7 +81,7 @@ PySDR is developed to be used, among others, with the RMDS designs by the MLAB p
 
 [Technical description](http://wiki.mlab.cz/doku.php?id=en:rmds)
 
-[Purchase from UST](http://www.ust.cz/shop/product_info.php?products_id=223)
+[Purchase from UST](https://www.tindie.com/products/ust/radio-meteor-detection-station-rmds/)
 
 ## License
 
