@@ -8,7 +8,7 @@ def reduce(a, div=4, start=1, stop=3):
 
 def coroutine():
     def sleep(time):
-        for i in xrange(int(math.ceil(float(time) / row_duration))):
+        for i in range(int(math.ceil(float(time) / row_duration))):
             yield
 
     if len(args) != 5:
@@ -29,7 +29,7 @@ def coroutine():
     for i in sleep(2.0):
         yield
 
-    freqs = xrange(int(args[2]), int(args[3]), int(args[4]))
+    freqs = range(int(args[2]), int(args[3]), int(args[4]))
 
     nmeas_rows = int(math.ceil(float(1.0) / row_duration))
     arr = np.zeros(nmeas_rows, dtype=np.float32)
@@ -37,13 +37,13 @@ def coroutine():
     with file(args[1], 'w') as outfile:
         for freq in freqs:
             fgen.recall_nvm()
-            print "resetting"
+            print("resetting")
             for i in sleep(0.2):
                 yield
 
             freq_mhz = float(freq) / 1000000
             fgen.set_freq(10., freq_mhz * 2)
-            print "setting freq %f" % freq_mhz
+            print("setting freq %f" % freq_mhz)
             for i in sleep(1.0):
                 yield
 
@@ -51,13 +51,13 @@ def coroutine():
 
             emit_event("mlab.aabb_event.measurement_area", (row, row + nmeas_rows, 0, 4096, "%f MHz" % (freq_mhz,)))
 
-            for i in xrange(nmeas_rows):
+            for i in range(nmeas_rows):
                 _r, _s, noise_lvl = yield
                 arr[i] = noise_lvl
 
             noise_lvl_sum = reduce(arr)
 
-            print "for freq %f, noise level is %f" % (freq_mhz, noise_lvl_sum)
+            print("for freq %f, noise level is %f" % (freq_mhz, noise_lvl_sum))
             outfile.write("\t%f\t%f\n" % (freq_mhz, noise_lvl_sum))
             outfile.flush()
 

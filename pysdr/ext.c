@@ -224,12 +224,12 @@ static PyObject *pysdr_jack_gather_midi_event(PyObject *self, PyObject *args)
 
     PyObject *string;
 
-    if ((string = PyString_FromStringAndSize(NULL, size)) == 0) {
+    if ((string = PyBytes_FromStringAndSize(NULL, size)) == 0) {
         jack_ringbuffer_read_advance(handle->midi_ringbuffer, size);
         return NULL;
     }
 
-    jack_ringbuffer_read(handle->midi_ringbuffer, PyString_AsString(string), size);
+    jack_ringbuffer_read(handle->midi_ringbuffer, PyUnicode_AsUTF8(string), size);
 
     return Py_BuildValue("(KN)", time, string);
 }

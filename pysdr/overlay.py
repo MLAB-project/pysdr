@@ -1,6 +1,6 @@
 import math
 
-from input import *
+from .input import *
 
 from OpenGL.GL import *
 from OpenGL.GLUT import *

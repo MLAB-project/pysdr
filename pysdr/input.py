@@ -24,15 +24,15 @@ class RawSigInput(SigInput):
 
     def read(self, frames):
         read_len = frames * self.dtype.itemsize * self.no_channels
-        string = ""
+        buffer = b''
 
-        while len(string) < read_len:
-            string += self.file.read(read_len - len(string))
+        while len(buffer) < read_len:
+            buffer += self.file.read(read_len - len(buffer))
 
         if self.no_channels == 1:
-            return np.fromstring(string, dtype=self.dtype).astype(np.float32)
+            return np.frombuffer(buffer, dtype=self.dtype).astype(np.float32)
         elif self.no_channels == 2 and self.dtype == np.dtype(np.float32):
-            return np.fromstring(string, dtype=np.complex64)
+            return np.frombuffer(buffer, dtype=np.complex64)
         else:
             raise NotImplementedError("unimplemented no of channels and type combination")
 

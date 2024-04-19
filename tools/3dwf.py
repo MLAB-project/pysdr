@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from __future__ import print_function
+
 
 import sys
 import math
@@ -16,7 +16,7 @@ import sdl2
 import sdl2.ext
 
 import OpenGL.GL as gl
-import Queue as queue
+import queue as queue
 
 from OpenGL.GL import *
 from OpenGL.GL import shaders

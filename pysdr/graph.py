@@ -69,7 +69,7 @@ class MultiTexture():
 
         init_image = np.zeros(self.unit_width * self.unit_height * 16, dtype=np.uint8)
 
-        for i in xrange(units_x * units_y):
+        for i in range(units_x * units_y):
             glEnable(GL_TEXTURE_2D)
             glBindTexture(GL_TEXTURE_2D, self.textures[i])
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
@@ -93,7 +93,7 @@ class MultiTexture():
         base = math.trunc(y / self.unit_height) * self.units_x
         offset_y = y - math.trunc(y / self.unit_height) * self.unit_height
 
-        for x in xrange(self.units_x):
+        for x in range(self.units_x):
             glBindTexture(GL_TEXTURE_2D, self.textures[base + x])
             glTexSubImage2D(GL_TEXTURE_2D, 0, 0, offset_y, self.unit_width, 1, format, type,
                             line[x * self.unit_width:(x + 1) * self.unit_width])
@@ -102,8 +102,8 @@ class MultiTexture():
         glEnable(GL_TEXTURE_2D)
         glColor3f(1.0, 1.0, 1.0)
 
-        for y in xrange(self.units_y):
-            for x in xrange(self.units_x):
+        for y in range(self.units_y):
+            for x in range(self.units_x):
                 glBindTexture(GL_TEXTURE_2D, self.textures[self.units_x * y + x])
                 xa, xb = (float(x) / self.units_x), (float(x + 1) / self.units_x)
                 ya, yb = (float(y) / self.units_y), (float(y + 1) / self.units_y)
@@ -132,7 +132,7 @@ class MultiTexture():
         if y == 0:
             ya, yb = 1.0 - row_shift, 1.0
             tya, tyb = 0, row_shift * self.units_y
-            for x in xrange(self.units_x):
+            for x in range(self.units_x):
                 glBindTexture(GL_TEXTURE_2D, self.textures[self.units_x * row + x])
                 xa, xb = (float(x) / self.units_x), (float(x + 1) / self.units_x)
 
@@ -149,7 +149,7 @@ class MultiTexture():
 
             ya, yb = 0.0, (1.0 / float(self.units_y)) - row_shift
             tya, tyb = row_shift * self.units_y, 1.0
-            for x in xrange(self.units_x):
+            for x in range(self.units_x):
                 glBindTexture(GL_TEXTURE_2D, self.textures[self.units_x * row + x])
                 xa, xb = (float(x) / self.units_x), (float(x + 1) / self.units_x)
 
@@ -167,7 +167,7 @@ class MultiTexture():
         else:
             ya, yb = (float(y) / self.units_y) - row_shift, (float(y + 1) / self.units_y) - row_shift
 
-            for x in xrange(self.units_x):
+            for x in range(self.units_x):
                 glBindTexture(GL_TEXTURE_2D, self.textures[self.units_x * row + x])
                 xa, xb = (float(x) / self.units_x), (float(x + 1) / self.units_x)
 
@@ -187,7 +187,7 @@ class MultiTexture():
         glEnable(GL_TEXTURE_2D)
         glColor3f(1.0, 1.0, 1.0)
 
-        for y in xrange(self.units_y):
+        for y in range(self.units_y):
             self.draw_row(edge, y)
 
         glDisable(GL_TEXTURE_2D)
@@ -210,7 +210,8 @@ class WaterfallFlat():
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, self.width, self.height, 0, GL_RGB, GL_BYTE, 0)
 
     def __del__(self):
-        glDeleteTextures(self.texture)
+        if hasattr(self, 'textures') and self.textures is not None:
+            glDeleteTextures(self.textures)
 
     def insert(self, line):
         glBindTexture(GL_TEXTURE_2D, self.texture)

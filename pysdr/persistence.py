@@ -29,7 +29,7 @@ def pers_load(viewer, filename):
 		for t, n in fields:
 			setnestedattr(viewer, n, t(obj[n]))
 	except IOError as e:
-		print "could not load the persistance file:", e
+		print("could not load the persistance file:", e)
 
 def pers_save(viewer, filename):
 	obj = dict([(name, getnestedattr(viewer, name)) for _, name in fields])

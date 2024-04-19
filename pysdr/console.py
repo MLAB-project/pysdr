@@ -81,7 +81,7 @@ class Console(InteractiveConsole):
             split[0] = self.lines.pop() + split[0]
 
         self.lines += [s[x:x + self.columns_cutoff] for s in split for x \
-                        in (range(0, len(s), self.columns_cutoff) if len(s) else [0])]
+                        in (list(range(0, len(s), self.columns_cutoff)) if len(s) else [0])]
 
         while len(self.lines) > self.lines_cutoff:
             self.lines.pop(0)
@@ -95,7 +95,7 @@ class Console(InteractiveConsole):
             return False
 
         if key == '\r':
-            print self.prompt + self.last_line
+            print((self.prompt + self.last_line))
             if self.push(self.last_line):
                 self.prompt = "... "
             else:

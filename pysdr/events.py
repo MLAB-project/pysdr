@@ -15,7 +15,7 @@ class EventMarker:
         if event_id.startswith('mlab.aabb_event.'):
             event_mark = (event_id, (payload[0], payload[1]), (payload[2], payload[3]), payload[4])
 
-            for i in xrange(len(self.marks)):
+            for i in range(len(self.marks)):
                 mark = self.marks[i]
                 if (mark[0] == event_mark[0] and mark[1][0] == event_mark[1][0]
                         and event_mark[2] == event_mark[2]):
@@ -106,7 +106,7 @@ SCRIPT_API_METHODS = dict()
 
 class DetectorScript:
     def script_api(func):
-        SCRIPT_API_METHODS[func.func_name] = func
+        SCRIPT_API_METHODS[func.__name__] = func
 
     @script_api
     def peak(self, a, b, s):
@@ -156,18 +156,18 @@ class DetectorScript:
             'row_duration': self.viewer.row_duration
         }
 
-        for name, func in SCRIPT_API_METHODS.items():
+        for name, func in list(SCRIPT_API_METHODS.items()):
             self.namespace[name] = func.__get__(self, DetectorScript)
 
-        execfile(self.filename, self.namespace)
+        exec(compile(open(self.filename, "rb").read(), self.filename, 'exec'), self.namespace)
 
     def draw_screen(self):
-        for plot in self.plots.values():
+        for plot in list(self.plots.values()):
             if hasattr(plot.__class__, 'draw_screen'):
                 plot.draw_screen()
 
     def draw_content(self):
-        for plot in self.plots.values():
+        for plot in list(self.plots.values()):
             if hasattr(plot.__class__, 'draw_content'):
                 plot.draw_content()
 
@@ -184,7 +184,7 @@ class DetectorScript:
         try:
             self.namespace[name](self.viewer.process_row, spectrum)
         except Exception:
-            print "exception in %s, disabling:" % self.filename
+            print("exception in %s, disabling:" % self.filename)
             traceback.print_exc(file=sys.stdout)
             self.disabled = True
 
@@ -211,6 +211,6 @@ class MIDIEventGatherer:
 
                     [l.on_event(event_id, payload) for l in self.listeners]
                 except (ValueError, TypeError) as e:
-                    print "failed to parse MIDI message '%s': %s" % (message[2:-1], e)
+                    print("failed to parse MIDI message '%s': %s" % (message[2:-1], e))
             else:
-                print "unknown MIDI message at frame %d: %s" % (frame, message.encode("hex"))
+                print("unknown MIDI message at frame %d: %s" % (frame, message.encode("hex")))

@@ -332,7 +332,7 @@ class WaterfallWindow(Viewer):
         self.overlap = overlap
         self.row_duration = float(bins - overlap) / sig_input.sample_rate
         # TODO: can we be sure the texture will be stored as floats internally?
-        self.multitexture = MultiTexture(1024, 1024, self.bins / 1024, 1, format=GL_RED, type=GL_FLOAT)
+        self.multitexture = MultiTexture(1024, 1024, self.bins // 1024, 1, format=GL_RED, type=GL_FLOAT)
 
         self.start_time = time.time() if start_time is None else start_time
 
@@ -345,7 +345,7 @@ class WaterfallWindow(Viewer):
                                                   cutoff=(-1.0, 1.0)), time_axis)
         self.layers.append(self.overlay)
 
-        self.texture_inserts = Queue.Queue()
+        self.texture_inserts = queue.Queue()
         self.texture_edge = 0
 
         self.texture_row = 0
@@ -398,7 +398,7 @@ class WaterfallWindow(Viewer):
                 self.call_layers('on_texture_insert')
 
                 glutPostRedisplay()
-        except Queue.Empty:
+        except queue.Empty:
             return
 
     def process(self):
@@ -417,7 +417,7 @@ class WaterfallWindow(Viewer):
             signal = ringbuf[ringbuf_edge - self.bins:ringbuf_edge]
 
             spectrum = np.absolute(np.fft.fft(np.multiply(signal, self.window)))
-            spectrum = np.concatenate((spectrum[self.bins/2:self.bins], spectrum[0:self.bins/2]))
+            spectrum = np.concatenate((spectrum[self.bins//2:self.bins], spectrum[0:self.bins//2]))
 
             self.call_layers('on_lin_spectrum', (spectrum,))
             spectrum = np.log10(spectrum) * 10
@@ -519,7 +519,7 @@ def main():
         raise ValueError("number of overlapping bins is out of bounds")
 
     if args.raw is not None:
-        sig_input = RawSigInput(args.raw, 2, np.dtype(np.float32), sys.stdin)
+        sig_input = RawSigInput(args.raw, 2, np.dtype(np.float32), sys.stdin.buffer)
     else:
         sig_input = JackInput(args.jack)
 

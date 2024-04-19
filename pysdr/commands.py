@@ -34,7 +34,7 @@ def screenshot(viewer):
         Image.fromarray(image[::-1,:,:].copy()).save(time.strftime("screenshot_%Y%m%d%H%M%S.png",
                                                                    time.gmtime()))
     except Exception as e:
-        print e
+        print(e)
 
 def textureshot(viewer):
     prev_view = viewer.view
@@ -65,8 +65,8 @@ def textureshot(viewer):
         view.scale_x, viewer.view.scale_y = float(resolution[0]) / 2, float(resolution[1])
         view.origin_x = resolution[0] / 2
 
-        for x in xrange(viewer.multitexture.units_x):
-            for y in xrange(viewer.multitexture.units_y):
+        for x in range(viewer.multitexture.units_x):
+            for y in range(viewer.multitexture.units_y):
                 glClear(GL_COLOR_BUFFER_BIT)
                 glClearColor(0, 0, 0, 1)
                 glLoadIdentity()
@@ -98,7 +98,7 @@ def textureshot(viewer):
                                                                    time.gmtime()))
 
     except Exception as e:
-        print e
+        print(e)
 
     viewer.view = prev_view
     viewer.cb_reshape(prev_screen_size[0], prev_screen_size[1])
