@@ -36,14 +36,14 @@ class AsyncWorker(threading.Thread):
             self.working = False
 
 def waterfallize(signal, bins):
-    window = 0.5 * (1.0 - np.cos((2 * math.pi * np.arange(bins)) / bins))
-    segment = bins / 2
-    nsegments = int(len(signal) / segment)
+    window = 0.5 * (1.0 - np.cos((2 * math.pi * np.arange(bins)) // bins))
+    segment = bins // 2
+    nsegments = int(len(signal) // segment)
     m = np.repeat(np.reshape(signal[0:segment * nsegments], (nsegments, segment)), 2, axis=0)
     t = np.reshape(m[1:len(m) - 1], (nsegments - 1, bins))
     img = np.multiply(t, window)
     wf = np.log(np.abs(np.fft.fft(img)))
-    return np.concatenate((wf[:, bins / 2:bins], wf[:, 0:bins / 2]), axis=1)
+    return np.concatenate((wf[:, bins // 2:bins], wf[:, 0:bins // 2]), axis=1)
 
 class RecordViewer(Viewer):
     def __init__(self, signal, sample_rate=None):
